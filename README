@@ -1,0 +1,79 @@
+# RAD
+
+<img src="./RAD/logo.png" width="150px" style="margin-left: auto; margin-right: auto; display: block;">
+
+RAD is a code generation framework for generating Web APIs and API clients from existing Kotlin web service projects.
+
+
+
+## Usage
+
+In your `build.gradle`, add RAD to your plugins:
+
+```gradle
+plugins {
+    id 'dk.cachet.rad' version '0.1.0'
+}
+```
+
+### Generating Web API
+
+In your `build.gradle`, add the `radGenerateWebApi` task:
+
+```gradle
+radGenerateWebApi {
+    // Settings
+}
+```
+
+### Generating API Client
+
+In your `build.gradle`, add the `radGenerateApiClient` task:
+
+```gradle
+radGenerateApiClient {
+    // Settings
+}
+```
+
+## Example
+
+The following code:
+
+```kotlin
+@RADMethod
+fun CreateUser(userName: String, email: String) : Boolean
+{
+    ...
+}
+```
+
+will generate the following Ktor route:
+
+```kotlin
+route("/api/createUser/") {
+    post {
+        val queryParameters: Parameters = call.request.queryParameters
+        val userName: String = queryParameters["userName"]
+        val email: String = queryParameters["email"]
+        val result = CreateUser(userName, email)
+        call.responds(result)
+    }
+}
+```
+
+and the following API client method:
+
+```kotlin
+fun createUser(userName: String, email: String) : Boolean {
+    val response = client.request {
+        url("/api/createUser")
+        method = HttpMethod.Post
+        body = json.write(object {
+            val userName: String = userName,
+            val email: String = email
+        })
+    }
+    return response.result
+}
+```

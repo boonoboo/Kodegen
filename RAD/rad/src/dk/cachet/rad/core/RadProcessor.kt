@@ -3,17 +3,19 @@ package dk.cachet.rad.core
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
 import java.io.File
-import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.*
 import javax.tools.Diagnostic
 import io.ktor.application.Application
 import io.ktor.client.HttpClient
+import javax.annotation.processing.*
 import javax.lang.model.element.ElementKind
 
 @AutoService(Processor::class)
-@SupportedOptions(RadMethodProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
-sealed class RadMethodProcessor : AbstractProcessor() {
+@SupportedSourceVersion(SourceVersion.RELEASE_11)
+@SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
+@SupportedAnnotationTypes("dk.cachet.rad.core.RadMethod")
+class RadProcessor : AbstractProcessor() {
     companion object {
         const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
     }
@@ -22,7 +24,6 @@ sealed class RadMethodProcessor : AbstractProcessor() {
      * Processes all elements annotated with "RadMethod"
      */
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
-        println("Processing RAD annotations")
         roundEnv.getElementsAnnotatedWith(RadMethod::class.java).forEach {
             val methodElement = it as ExecutableElement
 
@@ -37,7 +38,7 @@ sealed class RadMethodProcessor : AbstractProcessor() {
 
             val targetPackage = processingEnv.elementUtils.getPackageOf(methodElement).toString()
             generateServerMethod(methodElement, targetPackage)
-            generateClientMethod(methodElement, targetPackage)
+            //generateClientMethod(methodElement, targetPackage)
         }
         return false
     }

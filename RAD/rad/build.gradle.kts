@@ -11,9 +11,9 @@ kapt {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    implementation("io.ktor:ktor-server-jetty:1.3.0")
-    implementation("io.ktor:ktor-client-core:1.3.0")
-    implementation("io.ktor:ktor-client-apache:1.3.0")
+    api("io.ktor:ktor-server-jetty:1.3.0")
+    api("io.ktor:ktor-client-core:1.3.0")
+    api("io.ktor:ktor-client-apache:1.3.0")
 
     kapt("com.google.auto.service:auto-service:1.0-rc2")
     implementation("com.squareup:kotlinpoet:1.5.0")

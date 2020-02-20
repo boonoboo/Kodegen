@@ -12,10 +12,6 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(project(":rad"))
 
-    implementation("io.ktor:ktor-server-jetty:1.3.0")
-    implementation("io.ktor:ktor-client-core:1.3.0")
-    implementation("io.ktor:ktor-client-apache:1.3.0")
-
     // Run kapt on any annotation processors discovered by AutoService
     kapt(project(":rad"))
 }

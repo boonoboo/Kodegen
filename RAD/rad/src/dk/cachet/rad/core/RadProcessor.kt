@@ -12,7 +12,7 @@ import javax.annotation.processing.*
 import javax.lang.model.element.ElementKind
 
 @AutoService(Processor::class)
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
+@SupportedSourceVersion(SourceVersion.RELEASE_13)
 @SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
 @SupportedAnnotationTypes("dk.cachet.rad.core.RadMethod")
 class RadProcessor : AbstractProcessor() {
@@ -38,7 +38,7 @@ class RadProcessor : AbstractProcessor() {
 
             val targetPackage = processingEnv.elementUtils.getPackageOf(methodElement).toString()
             generateServerMethod(methodElement, targetPackage)
-            //generateClientMethod(methodElement, targetPackage)
+            generateClientMethod(methodElement, targetPackage)
         }
         return false
     }
@@ -63,11 +63,9 @@ class RadProcessor : AbstractProcessor() {
             .returns(Unit::class)
 
         // TODO: Initiate routing
-        /*
-        val ktorRoutingMember = MemberName("io.ktor.routing", "Application.routing")
-        moduleFunctionBuilder
-            .addStatement("routing { ... }")
-         */
+        // val ktorRoutingMember = MemberName("io.ktor.routing", "Application.routing")
+        // moduleFunctionBuilder
+        //    .addStatement("routing { ... }")
 
         // TODO: Create endpoint corresponding to the methodElement
         // 1st step: Route on HTTP Method (Only POST for now)
@@ -114,10 +112,13 @@ class RadProcessor : AbstractProcessor() {
 
         // Create endpoint corresponding to the methodElement
         // 1st step: Open client
-        clientFunctionBuilder.addStatement("val client = %M", HttpClient())
+        val httpClientMemberName = MemberName("io.ktor.client", "HttpClient")
+        clientFunctionBuilder.addStatement("val client = %M()", httpClientMemberName)
 
         // 2nd step: Make request
-        clientFunctionBuilder.addStatement("val response = client.post(\"$apiURL\"")
+        val postMemberName = MemberName("io.ktor.client.request", "post")
+        val returnType = methodElement.returnType.asTypeName()
+        clientFunctionBuilder.addStatement("val response = client.%M<$returnType>(%S)", postMemberName, apiURL)
 
         // 3rd step: Close client
         clientFunctionBuilder.addStatement("client.close()")

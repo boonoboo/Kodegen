@@ -7,12 +7,11 @@ import javax.lang.model.SourceVersion
 import javax.lang.model.element.*
 import javax.tools.Diagnostic
 import io.ktor.application.Application
-import io.ktor.client.HttpClient
 import javax.annotation.processing.*
 import javax.lang.model.element.ElementKind
 
 @AutoService(Processor::class)
-@SupportedSourceVersion(SourceVersion.RELEASE_13)
+@SupportedSourceVersion(SourceVersion.RELEASE_11)
 @SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
 @SupportedAnnotationTypes("dk.cachet.rad.core.RadMethod")
 class RadProcessor : AbstractProcessor() {
@@ -62,25 +61,49 @@ class RadProcessor : AbstractProcessor() {
             .receiver(Application::class)
             .returns(Unit::class)
 
-        // TODO: Initiate routing
-        // val ktorRoutingMember = MemberName("io.ktor.routing", "Application.routing")
-        // moduleFunctionBuilder
-        //    .addStatement("routing { ... }")
+        // Initiate routing
+        val routingMemberName = MemberName("io.ktor.routing", "routing")
+        moduleFunctionBuilder
+            .addStatement("%M {", routingMemberName)
+
 
         // TODO: Create endpoint corresponding to the methodElement
         // 1st step: Route on HTTP Method (Only POST for now)
-        // .addStatement("post(%functionName { ... }")
+        val postMemberName = MemberName("io.ktor.routing", "post")
+        val apiUrl = "/api/${methodElement.simpleName}"
+        moduleFunctionBuilder
+            .addStatement("%M(%S) {", postMemberName, apiUrl)
+
         // 2nd step: Get all parameters
-        // method.parameters.forEach { ... }
-        // .addStatement("val %parameterName = call.parameters["%parameterName"]
+        val callMemberName = MemberName("io.ktor.application", "call")
+        methodElement.parameters.forEach {
+            val parameterName = it.simpleName
+            val parameterType = it.asType().asTypeName()
+            moduleFunctionBuilder
+                .addStatement("val $parameterName = %M.request.queryParameters[%S]", callMemberName, parameterName)
+                // TODO: Solve String? -> parameterType issue
+        }
+
         // 3rd step: Call the function
-        // .addStatement("val result = %functionName(%parameters))
+        var resultStatement = "val result = ${methodElement.simpleName}("
+        methodElement.parameters.forEach { it ->
+            resultStatement = "$resultStatement${it.simpleName}"
+            if(methodElement.parameters.indexOf(it) != methodElement.parameters.lastIndex) {
+                resultStatement = "$resultStatement, "
+            }
+        }
+        resultStatement = "$resultStatement)"
+
+        // TODO: Consider suspend if function call is asynchronous
+        moduleFunctionBuilder
+            .addStatement(resultStatement)
+
         // 4th step: Return the result
-        // .addStatement("call.respond(result))"
-        //methodElement.parameters.forEach {
-        //    functionBuilder
-        //        .addParameter(it.toString(), it.asType().asTypeName())
-        //}
+        val respondMemberName = MemberName("io.ktor.response", "respond")
+        moduleFunctionBuilder
+            .addStatement("%M.%M(result)", callMemberName, respondMemberName)
+            .addStatement("}") // post end
+            .addStatement("}") //routing end
 
         // Build the file
         val file = File(generatedSourcesRoot)

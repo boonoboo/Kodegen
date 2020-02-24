@@ -8,8 +8,14 @@ class Main {
         println("Hello from main")
     }
 
-    @RadMethod
-    fun RollDice(): Int {
-        return Random.nextInt(1,7)
-    }
+
+}
+
+fun RollDice(): Int {
+    return Random.nextInt(1,7)
+}
+
+@RadMethod
+fun RollMultipliedDice(factor: Int): Int {
+    return RollDice() * factor
 }

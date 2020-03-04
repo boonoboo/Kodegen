@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     kotlin("kapt")
+    application
 }
 
 kapt {
@@ -12,60 +13,18 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(project(":rad"))
 
-    // Run kapt on any annotation processors discovered by AutoService
+    //
+    implementation("io.ktor:ktor-server-jetty:1.3.0")
+    implementation("io.ktor:ktor-server-core:1.3.0")
+
+    // Run kapt using the RAD project
     kapt(project(":rad"))
 }
 
 sourceSets["main"].java.srcDir("src")
+sourceSets["main"].resources.srcDir("resources")
 
-/*
-kotlin {
-    jvm()
-    js {
-        browser {
-        }
-        nodejs {
-        }
-    }
-
-    mingwX64("mingw")
-    sourceSets {
-        commonMain {
-            dependencies {
-                implementation kotlin('stdlib-common')
-            }
-        }
-        commonTest {
-            dependencies {
-                implementation kotlin('test-common')
-                implementation kotlin('test-annotations-common')
-            }
-        }
-        jvmMain {
-            dependencies {
-                implementation kotlin('stdlib-jdk8')
-            }
-        }
-        jvmTest {
-            dependencies {
-                implementation kotlin('test')
-                implementation kotlin('test-junit')
-            }
-        }
-        jsMain {
-            dependencies {
-                implementation kotlin('stdlib-js')
-            }
-        }
-        jsTest {
-            dependencies {
-                implementation kotlin('test-js')
-            }
-        }
-        mingwMain {
-        }
-        mingwTest {
-        }
-    }
+// Configure the application plugin
+application {
+    mainClassName = "dk.cachet.rad.example.server.MainKt"
 }
- */

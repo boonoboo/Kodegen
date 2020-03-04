@@ -1,79 +1,136 @@
-# RAD
+# RADDD
 
 <img src="./RAD/logo.png" width="150px" style="margin-left: auto; margin-right: auto; display: block;">
 
-RAD is a code generation framework for generating Web APIs and API clients from existing Kotlin web service projects.
-
-
+RADDD is a library for generating Web APIs and API clients for Kotlin web services.
 
 ## Usage
 
-In your `build.gradle`, add RAD to your plugins:
+In your `build.gradle`, add RADDD to your plugins:
 
 ```gradle
 plugins {
-    id 'dk.cachet.rad' version '0.1.0'
+    id 'dk.cachet.raddd' version '1.0.0'
 }
 ```
 
-### Generating Web API
-
-In your `build.gradle`, add the `radGenerateWebApi` task:
+Then, add the `raddd` task to your dependencies:
 
 ```gradle
-radGenerateWebApi {
-    // Settings
+dependencies {
+    raddd
 }
-```
+````
 
-### Generating API Client
-
-In your `build.gradle`, add the `radGenerateApiClient` task:
+To configure RADDD, use the ```raddd``` task:
 
 ```gradle
-radGenerateApiClient {
+raddd {
     // Settings
+    generateWebApi = true
+    generateClient = true
 }
 ```
 
-## Example
+## Examples
 
-The following code:
+### Basic use
+
+Given the following function:
 
 ```kotlin
-@RADMethod
-fun CreateUser(userName: String, email: String) : Boolean
+@RADDDMethod
+fun createUser(userName: String, email: String) : Boolean
 {
     ...
 }
 ```
 
-will generate the following Ktor route:
+RADDD will, on compilation, generate the following Ktor route:
 
 ```kotlin
-route("/api/createUser/") {
-    post {
-        val queryParameters: Parameters = call.request.queryParameters
-        val userName: String = queryParameters["userName"]
-        val email: String = queryParameters["email"]
-        val result = CreateUser(userName, email)
-        call.responds(result)
-    }
+post("/api/createUser/") {
+    val request = call.receive<CreateUserRequest>()
+    val userName: String = request.userName
+    val email: String = email = request.email
+    val result = createUser(userName, email)
+    call.respond(result)
 }
 ```
 
 and the following API client method:
 
 ```kotlin
-fun createUser(userName: String, email: String) : Boolean {
-    val response = client.request {
-        url("/api/createUser")
-        method = HttpMethod.Post
-        body = json.write(object {
-            val userName: String = userName,
-            val email: String = email
-        })
+suspend fun createUser(userName: String, email: String) : Boolean {
+    val client = HttpClient()
+    val response = client.post<Boolean>("api/createUser") {
+        body = json.write(CreateUserRequest(userName, email))
     }
+    client.close()
+    return response.result
+}
+```
+
+both of which use the following request object:
+
+```kotlin
+data class CreateUserRequest(val userName: String, val email: String)
+```
+
+### Authorisations
+
+Adding the ```RADDDAuthorize``` annotation to the ```createUser``` function with a list of allowed roles:
+
+```kotlin
+@RADDDMethod
+@RADDDAuthorize(["Admin", "Superuser"])
+fun createUser(userName: String, email: String) : Boolean
+{
+    ...
+}
+```
+
+causes RADDD to install the following Ktor authorisation:
+
+```kotlin
+install(Authentication) {
+    basic(name = "Admin") {
+        realm = "Server"
+        validate { credentials -> ... }
+    }
+}
+```
+
+This also modifies the Web API endpoint:
+
+```kotlin
+authenticate("Admin") {
+    post("/api/createUser/") {
+        val request = call.receive<CreateUserRequest>()
+        val userName: String = request.userName
+        val email: String = email = request.email
+        val result = createUser(userName, email)
+        call.respond(result)
+    }
+}
+```
+
+and the API client method:
+
+```kotlin
+suspend fun createUser(userName: String, email: String) : Boolean {
+    val client = HttpClient() {
+        install(Auth) {
+            basic {
+                ...
+            }
+        }
+    }
+
+    val response = client.post<Boolean>("api/createUser") {
+        body = json.write(CreateUserRequest(userName, email))
+    }
+    client.close()
     return response.result
 }
 ```

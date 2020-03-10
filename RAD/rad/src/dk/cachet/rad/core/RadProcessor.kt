@@ -2,16 +2,20 @@ package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.metadata.*
+import com.squareup.kotlinpoet.metadata.specs.*
+
 import io.ktor.application.Application
 import java.io.File
-import java.io.Serializable
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
+import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
+@KotlinPoetMetadataPreview
 @AutoService(Processor::class)
 @SupportedSourceVersion(SourceVersion.RELEASE_11)
 @SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
@@ -55,6 +59,7 @@ class RadProcessor : AbstractProcessor() {
     }
 
     fun generateRequestObject(methodElement: ExecutableElement, packageOfMethod: String) {
+        // TODO: Generate serializer
         // Error checking
         val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
         if (generatedSourcesRoot.isEmpty()) {
@@ -81,9 +86,31 @@ class RadProcessor : AbstractProcessor() {
         // Create request object constructor function
         val constructorFunctionBuilder = FunSpec.constructorBuilder()
 
+        // TODO / EXPERIMENTAL:
+        // In order to avoid using TypeMirror, find the enclosing class of the method,
+        // then generate a TypeSpec from it.
+        // Finally, derive the method information from this
+        val enclosingClass = generateSequence<Element>(methodElement) {
+            it.enclosingElement
+        }.first { it is TypeElement } as TypeElement
+
+        // kClassApi now contains a TypeSpec for the class containing the function
+        val kClassApi = enclosingClass.toTypeSpec()
+        val kMethod = kClassApi.funSpecs.first { it.name == methodElement.simpleName.toString()} // TODO: Might not work
+        kMethod.parameters.forEach { parameter ->
+            constructorFunctionBuilder.addParameter(parameter.name, parameter.type)
+            requestObjectBuilder.addProperty(
+                PropertySpec.builder("${parameter.name}", parameter.type)
+                    .initializer("${parameter.name}")
+                    .build()
+            )
+        }
+        // TODO END OF EXPERIMENTAL
+
         // For each parameter in methodElement, add parameter to request object
         // and add property to the request object
-        // TODO: Kotlin Poet is unable to correctly identify if parameter.asType().asTypeName() should be the Java or Kotlin type
+        // TODO: Disabled for experimental code
+        /*
         methodElement.parameters.forEach { parameter ->
             constructorFunctionBuilder.addParameter(parameter.simpleName.toString(), parameter.asType().asTypeName())
             requestObjectBuilder.addProperty(
@@ -91,7 +118,7 @@ class RadProcessor : AbstractProcessor() {
                     .initializer("${parameter.simpleName}")
                     .build()
             )
-        }
+        }*/
 
         // Set constructor and add data modifier
         requestObjectBuilder
@@ -137,6 +164,16 @@ class RadProcessor : AbstractProcessor() {
             .addStatement("%M()", serializationMemberName)
             .endControlFlow()
         */
+
+        // TODO / EXPERIMENTAL:
+        // Expect that function is in a service object, and create it
+        // Consider handling / disallowing functions not in an enclosing class
+        val serviceClassName = methodElement.enclosingElement.simpleName.toString()
+        val serviceMemberName = MemberName(packageOfMethod, serviceClassName)
+
+        moduleFunctionBuilder.addStatement("val service = %M()", serviceMemberName)
+        // END OF TODO / EXPERIMENTAL
+
         // Initiate routing
         val routingMemberName = MemberName("io.ktor.routing", "routing")
         moduleFunctionBuilder
@@ -165,6 +202,8 @@ class RadProcessor : AbstractProcessor() {
             moduleFunctionBuilder
                 .addStatement("val request = %M.%M<$requestObjectName>()", callMemberName, recieveMemberName)
 
+            // TODO: Instead of using methodElement.parameters, get the enclosing class,
+            // TODO generate a typespec and find parameters from here, as is done in the request object
             // 3rd step: Get all parameters from request object
             methodElement.parameters.forEach {
                 val parameterName = it.simpleName
@@ -174,8 +213,8 @@ class RadProcessor : AbstractProcessor() {
         }
 
         // 4th step: Call the function
-        val functionMemberName = MemberName(packageOfMethod, methodElement.simpleName.toString())
-        var resultStatement = "val result = %M("
+        val functionName = methodElement.simpleName.toString()
+        var resultStatement = "val result = service.$functionName("
         methodElement.parameters.forEach { it ->
             resultStatement = "$resultStatement${it.simpleName}"
             if (methodElement.parameters.indexOf(it) != methodElement.parameters.lastIndex) {
@@ -186,7 +225,7 @@ class RadProcessor : AbstractProcessor() {
 
         // TODO: Consider suspension function calls
         moduleFunctionBuilder
-            .addStatement(resultStatement, functionMemberName)
+            .addStatement(resultStatement)
 
         // 5th step: Serialize and return the result
         val respondMemberName = MemberName("io.ktor.response", "respond")

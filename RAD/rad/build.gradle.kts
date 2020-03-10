@@ -28,9 +28,8 @@ dependencies {
 
     kapt("com.google.auto.service:auto-service:1.0-rc2")
     implementation("com.squareup:kotlinpoet:1.5.0")
-    //implementation("com.squareup:kotlinpoet-metadata:1.5.0")
-    //implementation("com.squareup:kotlinpoet-metadata-specs:1.5.0")
-    //implementation("me.eugeniomarletti.kotlin.metadata:kotlin-metadata:1.4.0")
+    implementation("com.squareup:kotlinpoet-metadata:1.5.0")
+    implementation("com.squareup:kotlinpoet-metadata-specs:1.5.0")
     implementation("com.google.auto.service:auto-service:1.0-rc2")
 }
 

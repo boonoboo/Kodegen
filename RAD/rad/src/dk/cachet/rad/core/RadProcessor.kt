@@ -3,15 +3,13 @@ package dk.cachet.rad.core
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.metadata.*
-import com.squareup.kotlinpoet.metadata.specs.*
+import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 
 import io.ktor.application.Application
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
-import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
-import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
@@ -21,273 +19,294 @@ import javax.tools.Diagnostic
 @SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
 @SupportedAnnotationTypes("dk.cachet.rad.core.RadMethod")
 class RadProcessor : AbstractProcessor() {
-    companion object {
-        const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
-    }
+	companion object {
+		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
+	}
 
-    /**
-     * Processes all elements annotated with "RadMethod"
-     */
-    override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
-        // TODO: Restructure code generation so that end result is:
-        // TODO: For each package, generate Application.module
-        // TODO: For each module, add a single routing
-        // TODO: For each RadMethod, add a post containing the RAD logic to this routing
+	/**
+	 * Processes all elements annotated with "RadMethod"
+	 */
+	override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
+		// Check if generated source root exists, and if not, return with an error message
+		val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
+		if (generatedSourcesRoot.isEmpty()) {
+			processingEnv.messager.printMessage(
+				Diagnostic.Kind.ERROR,
+				"Can't find the target directory for generated Kotlin files."
+			)
+			return false
+		}
 
-        // TODO: Consider methods for splitting routing / modules, e.g. if authentication is necessary
+		// TODO: Restructure code generation so that end result is:
+		// TODO: For each service, generate Application.serviceNameModule
+		// TODO: For each module, add a single routing
+		// TODO: For each method in the service, add a post containing the RAD logic for this routing
 
+		// TODO: Consider methods for splitting routing / modules, e.g. if authentication is necessary
 
-        // SERVER API GENERATION
-        roundEnv.getElementsAnnotatedWith(RadMethod::class.java).forEach {
-            val methodElement = it as ExecutableElement
+		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
+			val serviceElement = it as TypeElement
+			// If annotated element is not a class, skip past it
+			if (serviceElement.kind != ElementKind.CLASS) {
+				processingEnv.messager.printMessage(
+					Diagnostic.Kind.ERROR,
+					"Error while processing element: $serviceElement. Annotation @RadService can only be applied to classes."
+				)
+				return false
+			}
 
-            // If annotated element is not a function, do nothing
-            if (methodElement.kind != ElementKind.METHOD) {
-                processingEnv.messager.printMessage(
-                    Diagnostic.Kind.ERROR,
-                    "Error while processing element: $methodElement. Annotation \"RadMethod\" can only be applied to functions"
-                )
-                return false
-            }
+			// Get the package of the service, which will be used when generating the associated API
+			// TODO: Consider if target package should be specified somehow, e.g. in the annotation
+			// todo: e.g. @RadPackage("org.example.api"), or if it should be inferred from the service,
+			// todo: e.g. org.example.domain -> org.example.domain.rad
+			val servicePackage = processingEnv.elementUtils.getPackageOf(serviceElement).toString()
 
-            val targetPackage = processingEnv.elementUtils.getPackageOf(methodElement).toString()
-            generateRequestObject(methodElement, targetPackage)
-            generateServerMethod(methodElement, targetPackage)
-            generateClientMethod(methodElement, targetPackage)
-        }
-        return false
-    }
+			// Generate a KotlinPoet TypeSpec from the TypeClass, allowing Kotlin-specific information to be derived
+			// This is necessary because using javax Annotation Processing and Kotlin Poet to derive parameter
+			// information for methods may result in use of Java types instead of Kotlin types,
+			// e.g. using java.lang.String instead of kotlin.String
+			val serviceTypeSpec = serviceElement.toTypeSpec()
 
-    fun generateRequestObject(methodElement: ExecutableElement, packageOfMethod: String) {
-        // TODO: Generate serializer
-        // Error checking
-        val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
-        if (generatedSourcesRoot.isEmpty()) {
-            processingEnv.messager.printMessage(
-                Diagnostic.Kind.ERROR,
-                "Can't find the target directory for generated Kotlin files."
-            )
-            return
-        }
-        // If method takes no parameters, the request object is not necessary
-        if(methodElement.parameters.size == 0) return;
+			// Generate the request object, module and client
+			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+		}
+		return false
+	}
 
-        // Create data class for request object
-        // Set request object name
-        val requestObjectName = ClassName(packageOfMethod, "${methodElement.simpleName}Request")
+	private fun generateRequestObjects(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+		// TODO: Consider what target package should be
+		val targetPackage = "$servicePackage.rad"
 
-        // Create request object class builder
-        val requestObjectBuilder = TypeSpec.classBuilder(requestObjectName)
+		// Iterate through the methods of the service, generating a request object for each
+		serviceTypeSpec.funSpecs.forEach { funSpec ->
+			// TODO: Consider generating serializers for polymorphic / complex objects
+			// todo: where the @Serializable tag does not suffice
 
-        // Add serializable annotation
-        requestObjectBuilder.addAnnotation(kotlinx.serialization.Serializable::class)
+			// If method takes no parameters, the request object is not necessary
+			if(funSpec.parameters.isEmpty()) return@forEach
 
+			// Define name and package of generated class
+			val className = ClassName(targetPackage, "${funSpec.name}Request")
 
-        // Create request object constructor function
-        val constructorFunctionBuilder = FunSpec.constructorBuilder()
+			// Create class builder and set data modifier
+			val classBuilder = TypeSpec.classBuilder(className)
+				.addModifiers(KModifier.DATA)
 
-        // TODO / EXPERIMENTAL:
-        // In order to avoid using TypeMirror, find the enclosing class of the method,
-        // then generate a TypeSpec from it.
-        // Finally, derive the method information from this
-        val enclosingClass = generateSequence<Element>(methodElement) {
-            it.enclosingElement
-        }.first { it is TypeElement } as TypeElement
+			// Add serializable annotation
+			classBuilder.addAnnotation(kotlinx.serialization.Serializable::class)
 
-        // kClassApi now contains a TypeSpec for the class containing the function
-        val kClassApi = enclosingClass.toTypeSpec()
-        val kMethod = kClassApi.funSpecs.first { it.name == methodElement.simpleName.toString()} // TODO: Might not work
-        kMethod.parameters.forEach { parameter ->
-            constructorFunctionBuilder.addParameter(parameter.name, parameter.type)
-            requestObjectBuilder.addProperty(
-                PropertySpec.builder("${parameter.name}", parameter.type)
-                    .initializer("${parameter.name}")
-                    .build()
-            )
-        }
-        // TODO END OF EXPERIMENTAL
-
-        // For each parameter in methodElement, add parameter to request object
-        // and add property to the request object
-        // TODO: Disabled for experimental code
-        /*
-        methodElement.parameters.forEach { parameter ->
-            constructorFunctionBuilder.addParameter(parameter.simpleName.toString(), parameter.asType().asTypeName())
-            requestObjectBuilder.addProperty(
-                PropertySpec.builder("${parameter.simpleName}", parameter.asType().asTypeName())
-                    .initializer("${parameter.simpleName}")
-                    .build()
-            )
-        }*/
-
-        // Set constructor and add data modifier
-        requestObjectBuilder
-            .primaryConstructor(constructorFunctionBuilder.build())
-        if (methodElement.parameters.count() > 0) requestObjectBuilder.addModifiers(KModifier.DATA)
-
-        // Build the file
-        val file = File(generatedSourcesRoot)
-        file.mkdir()
-
-        FileSpec.builder("$packageOfMethod.${methodElement.simpleName}", "${methodElement.simpleName}Request")
-            .addType(requestObjectBuilder.build())
-            .build()
-            .writeTo(file)
-    }
-
-    fun generateServerMethod(methodElement: ExecutableElement, packageOfMethod: String) {
-        // Error checking
-        val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
-        if (generatedSourcesRoot.isEmpty()) {
-            processingEnv.messager.printMessage(
-                Diagnostic.Kind.ERROR,
-                "Can't find the target directory for generated Kotlin files."
-            )
-            return
-        }
-
-        // Create extension function "module" for Application
-        val moduleFunctionBuilder = FunSpec.builder("${methodElement.simpleName}Module")
-            .addModifiers(KModifier.PUBLIC)
-            .receiver(Application::class)
-            .returns(Unit::class)
-
-        // TODO: If authentication is required from any service, install Authentication
-
-        // Install content negotiation
-        /*
-        val installMemberName = MemberName("io.ktor.application", "install")
-        val contentNegotiationMemberName = MemberName("io.ktor.features", "ContentNegotiation")
-        val serializationMemberName = MemberName("io.ktor.serialization", "serialization")
-        moduleFunctionBuilder
-            .beginControlFlow("%M(%M)", installMemberName, contentNegotiationMemberName)
-            .addStatement("%M()", serializationMemberName)
-            .endControlFlow()
-        */
-
-        // TODO / EXPERIMENTAL:
-        // Expect that function is in a service object, and create it
-        // Consider handling / disallowing functions not in an enclosing class
-        val serviceClassName = methodElement.enclosingElement.simpleName.toString()
-        val serviceMemberName = MemberName(packageOfMethod, serviceClassName)
-
-        moduleFunctionBuilder.addStatement("val service = %M()", serviceMemberName)
-        // END OF TODO / EXPERIMENTAL
-
-        // Initiate routing
-        val routingMemberName = MemberName("io.ktor.routing", "routing")
-        moduleFunctionBuilder
-            .beginControlFlow("%M {", routingMemberName)
+			// Create constructor builder
+			val constructorBuilder = FunSpec.constructorBuilder()
 
 
-        // Create endpoint corresponding to the methodElement
-        // 1st step: Route on HTTP Method (Only POST for now)
-        val postMemberName = MemberName("io.ktor.routing", "post")
+			funSpec.parameters.forEach { parameter ->
+				constructorBuilder.addParameter(parameter.name, parameter.type)
+				classBuilder.addProperty(
+					PropertySpec.builder(parameter.name, parameter.type)
+						.initializer(parameter.name)
+						.build()
+				)
+			}
 
-        // TODO / PROTOTYPE: API corresponds to package name
-        // TODO: Consider alternatives for generating API but avoiding conflicts
-        // TODO: e.g. require unique function names, randomly generated API UUID, single URI endpoint only
-        val apiUrl = "/radApi/${packageOfMethod.replace(".", "/")}/${methodElement.simpleName}"
-        moduleFunctionBuilder
-            .beginControlFlow("%M(%S) {", postMemberName, apiUrl)
+			// Set constructor and build the class
+			classBuilder
+				.primaryConstructor(constructorBuilder.build())
 
-        // If the method takes parameters, attempt to receive the request object
-        // 2nd step: Get request object
-        val callMemberName = MemberName("io.ktor.application", "call")
-        val recieveMemberName = MemberName("io.ktor.request", "receive")
-        val requestObjectName =
-            ClassName("$packageOfMethod.${methodElement.simpleName}", "${methodElement.simpleName}Request")
+			// Build the file
+			val file = File(generatedSourcesRoot)
+			file.mkdir()
 
-        if(methodElement.parameters.size != 0) {
-            moduleFunctionBuilder
-                .addStatement("val request = %M.%M<$requestObjectName>()", callMemberName, recieveMemberName)
+			FileSpec.builder(targetPackage, "${funSpec.name}Request")
+				.addType(classBuilder.build())
+				.build()
+				.writeTo(file)
+		}
+	}
 
-            // TODO: Instead of using methodElement.parameters, get the enclosing class,
-            // TODO generate a typespec and find parameters from here, as is done in the request object
-            // 3rd step: Get all parameters from request object
-            methodElement.parameters.forEach {
-                val parameterName = it.simpleName
-                moduleFunctionBuilder
-                    .addStatement("val $parameterName = request.$parameterName")
-            }
-        }
+	private fun generateModule(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+		val targetPackage = "$servicePackage.rad"
 
-        // 4th step: Call the function
-        val functionName = methodElement.simpleName.toString()
-        var resultStatement = "val result = service.$functionName("
-        methodElement.parameters.forEach { it ->
-            resultStatement = "$resultStatement${it.simpleName}"
-            if (methodElement.parameters.indexOf(it) != methodElement.parameters.lastIndex) {
-                resultStatement = "$resultStatement, "
-            }
-        }
-        resultStatement = "$resultStatement)"
+		// Create module extension function for Application class
+		// TODO: Consider if one module for all services should be generated or one module per service
+		val moduleFunctionBuilder = FunSpec.builder("${serviceTypeSpec.name}Module")
+			.addModifiers(KModifier.PUBLIC)
+			.receiver(Application::class)
+			.returns(Unit::class)
 
-        // TODO: Consider suspension function calls
-        moduleFunctionBuilder
-            .addStatement(resultStatement)
+		// TODO: If authentication is required from any service, install Authentication
 
-        // 5th step: Serialize and return the result
-        val respondMemberName = MemberName("io.ktor.response", "respond")
-        moduleFunctionBuilder
-            .addStatement("%M.%M(result)", callMemberName, respondMemberName)
-            .endControlFlow() // post end
-            .endControlFlow() //routing end
-
-        // Build the file
-        val file = File(generatedSourcesRoot)
-        file.mkdir()
-
-        FileSpec.builder("$packageOfMethod.${methodElement.simpleName}", "${methodElement.simpleName}ServerEndpoint")
-            .addFunction(moduleFunctionBuilder.build())
-            .build()
-            .writeTo(file)
-    }
-
-    fun generateClientMethod(methodElement: ExecutableElement, packageOfMethod: String) {
-        val apiURL = methodElement.simpleName.toString()
-
-        val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
-        if (generatedSourcesRoot.isEmpty()) {
-            processingEnv.messager.printMessage(
-                Diagnostic.Kind.ERROR,
-                "Can't find the target directory for generated Kotlin files."
-            )
-            return
-        }
-
-        // Create client function
-        val clientFunctionBuilder = FunSpec.builder("${methodElement.simpleName}ClientEndpoint")
-            .addModifiers(KModifier.PUBLIC)
-            .addModifiers(KModifier.SUSPEND)
-            .returns(methodElement.returnType.asTypeName())
-
-        // Create endpoint corresponding to the methodElement
-        // 1st step: Open client
-        val httpClientMemberName = MemberName("io.ktor.client", "HttpClient")
-        clientFunctionBuilder.addStatement("val client = %M()", httpClientMemberName)
-
-        // 2nd step: Make request
-        val postMemberName = MemberName("io.ktor.client.request", "post")
-        val returnType = methodElement.returnType.asTypeName()
-        clientFunctionBuilder.addStatement("val response = client.%M<$returnType>(%S)", postMemberName, apiURL)
-
-        // TODO: Add parameters to request
+		// TODO: If content negotiation is necessary, install content negotiation
+		/*
+		val installMemberName = MemberName("io.ktor.application", "install")
+		val contentNegotiationMemberName = MemberName("io.ktor.features", "ContentNegotiation")
+		val serializationMemberName = MemberName("io.ktor.serialization", "serialization")
+		moduleFunctionBuilder
+			.beginControlFlow("%M(%M)", installMemberName, contentNegotiationMemberName)
+			.addStatement("%M()", serializationMemberName)
+			.endControlFlow()
+		*/
 
 
-        // 3rd step: Close client
-        clientFunctionBuilder.addStatement("client.close()")
+		// Create service for calling service functions
+		// TODO: Consider cases with no service class / static class / class with parameterized constructor
+		val service = MemberName(servicePackage, serviceTypeSpec.name!!)
+		moduleFunctionBuilder.addStatement("val service = %M()", service)
 
-        // 4th step: Return the result
-        clientFunctionBuilder.addStatement("return response")
+		// Initiate routing
+		val routingMemberName = MemberName("io.ktor.routing", "routing")
+		moduleFunctionBuilder
+			.beginControlFlow("%M {", routingMemberName)
 
-        // Build the file
-        val file = File(generatedSourcesRoot)
-        file.mkdir()
 
-        FileSpec.builder("$packageOfMethod.${methodElement.simpleName}", "${methodElement.simpleName}ClientEndpoint")
-            .addFunction(clientFunctionBuilder.build())
-            .build()
-            .writeTo(file)
-    }
+		// Iterate through functions in service, generating a route for each
+		serviceTypeSpec.funSpecs.forEach { funSpec ->
+			// Create endpoint corresponding to the funSpec
+			// 1st step: Route on HTTP Method (POST)
+			val post = MemberName("io.ktor.routing", "post")
+
+			// TODO: Consider alternatives for URL but avoiding conflicts, e.g.:
+			//  require unique function names
+			//  use a randomly generated UUID for each function
+			//  use a single URI endpoint only and place the function invocation in the body (RPC style)
+
+			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
+			moduleFunctionBuilder
+				.beginControlFlow("%M(%S) {", post, apiUrl)
+
+			// If the method takes parameters, attempt to receive the request object
+			// 2nd step: Get request object
+			val call = MemberName("io.ktor.application", "call")
+
+			if(funSpec.parameters.isNotEmpty()) {
+				// TODO: Currently no static check that ClassName is the same as in generated request object
+				//  The ClassName Reference should be reused
+				val requestClassName = ClassName("$servicePackage.rad", "${funSpec.name}Request")
+				val receive = MemberName("io.ktor.request", "receive")
+
+				moduleFunctionBuilder
+					.addStatement("val request = %M.%M<$requestClassName>()", call, receive)
+
+				// 3rd step: Get all parameters from request object
+				funSpec.parameters.forEach { parameter ->
+					moduleFunctionBuilder
+						.addStatement("val ${parameter.name} = request.${parameter.name}")
+				}
+			}
+
+			// 4th step: Call the function
+			var resultStatement = "service.${funSpec.name}("
+			funSpec.parameters.forEach { parameter ->
+				resultStatement = "$resultStatement${parameter.name}"
+				if (funSpec.parameters.indexOf(parameter) != funSpec.parameters.lastIndex) {
+					resultStatement = "$resultStatement, "
+				}
+			}
+			resultStatement = "$resultStatement)"
+
+			// If the function to call is a suspended function, add an await to the function call
+			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
+				resultStatement = "await $resultStatement"
+			}
+			resultStatement = "val result = $resultStatement"
+
+			moduleFunctionBuilder
+				.addStatement(resultStatement)
+
+			// 5th step: Serialize and return the result
+			val respondMemberName = MemberName("io.ktor.response", "respond")
+			moduleFunctionBuilder
+				.addStatement("%M.%M(result)", call, respondMemberName)
+				.endControlFlow()
+		}
+
+		// End routing
+		moduleFunctionBuilder
+			.endControlFlow()
+
+		// Build the file
+		val file = File(generatedSourcesRoot)
+		file.mkdir()
+
+		FileSpec.builder(targetPackage, "${serviceTypeSpec.name!!}Module")
+			.addFunction(moduleFunctionBuilder.build())
+			.build()
+			.writeTo(file)
+	}
+
+	private fun generateClient(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+		val targetPackage = "$servicePackage.rad"
+
+		// Prepare FileSpec builder
+		val fileSpecBuilder = FileSpec.builder(targetPackage, "${serviceTypeSpec.name!!}Client")
+
+		// Iterate through functions, adding a client function for each
+		serviceTypeSpec.funSpecs.forEach { funSpec ->
+			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
+
+			// Create client function
+			val clientFunctionBuilder = FunSpec.builder("${funSpec.name}")
+				.addModifiers(KModifier.PUBLIC)
+				.addModifiers(KModifier.SUSPEND)
+				.returns(funSpec.returnType!!)
+
+			// For each parameter of the function, add them to the client function
+			funSpec.parameters.forEach { parameter ->
+				clientFunctionBuilder.addParameter(parameter)
+			}
+
+			// Create endpoint corresponding to the function
+			// 1st step: Open a HTTP client
+			val httpClient = MemberName("io.ktor.client", "HttpClient")
+			clientFunctionBuilder
+				.addStatement("val client = %M()", httpClient)
+
+
+
+			// 3rd step: Make request
+			val post = MemberName("io.ktor.client.request", "post")
+			val url = MemberName("io.ktor.client.request", "url")
+			val returnType = funSpec.returnType!!
+
+			clientFunctionBuilder
+				.beginControlFlow("val response = client.%M<$returnType>", post)
+				.addStatement("%M(%S)", url, apiUrl)
+
+			// If the function call has any parameters, serialize a request object and add it
+			if(funSpec.parameters.isNotEmpty())
+			{
+				var bodyStatement = "body = ${funSpec.name}Request("
+
+				funSpec.parameters.forEach { parameter ->
+					bodyStatement = "$bodyStatement${parameter.name} = ${parameter.name}"
+					if (funSpec.parameters.indexOf(parameter) != funSpec.parameters.lastIndex) {
+						bodyStatement = "$bodyStatement, "
+					}
+				}
+				bodyStatement = "$bodyStatement)"
+				clientFunctionBuilder
+					.addStatement(bodyStatement)
+			}
+
+			clientFunctionBuilder
+				.endControlFlow()
+
+			// 4th: step: Close the client and return the result
+			clientFunctionBuilder
+				.addStatement("client.close()")
+				.addStatement("return response")
+
+			// 5th step: Add function to FileSpec builder
+			fileSpecBuilder.addFunction(clientFunctionBuilder.build())
+		}
+
+		// Build the file
+		val file = File(generatedSourcesRoot)
+		file.mkdir()
+
+		fileSpecBuilder
+			.build()
+			.writeTo(file)
+	}
 }

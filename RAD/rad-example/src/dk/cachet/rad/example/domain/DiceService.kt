@@ -2,7 +2,9 @@ package dk.cachet.rad.example.domain
 
 import kotlin.random.Random
 import dk.cachet.rad.core.*
+import kotlinx.serialization.Serializable
 
+@RadService
 class DiceService {
     @RadMethod
     fun RollDice(): Int {
@@ -45,19 +47,8 @@ class DiceService {
 
     @RadMethod
     fun RollComplexDice(diceSpec: DiceSpecification): ComplexDiceRoll {
-        var eyes: Int? = null
-        var color: String? = null
-        if (diceSpec.facets != null) {
-            eyes = RollNSidedDice(diceSpec.facets)
-        }
-        if (diceSpec.colors != null) {
-            color = RollColoredDice(diceSpec.colors)
-        }
+        val eyes = RollNSidedDice(diceSpec.facets!!)
+        val color = RollColoredDice(diceSpec.colors!!)
         return ComplexDiceRoll(eyes, color)
-
     }
-
-    class DiceSpecification(val facets: Int?, val colors: List<String>?)
-
-    class ComplexDiceRoll(val eyes: Int?, val colors: String?)
 }

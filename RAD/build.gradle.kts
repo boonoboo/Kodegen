@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.3.61" apply false
     kotlin("kapt") version "1.3.61" apply false
+    kotlin("plugin.serialization") version "1.3.61" apply false
 }
 
 subprojects {

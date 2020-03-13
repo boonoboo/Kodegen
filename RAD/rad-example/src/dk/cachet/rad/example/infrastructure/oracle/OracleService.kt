@@ -1,6 +1,7 @@
-package dk.cachet.rad.example.domain.oracle
+package dk.cachet.rad.example.infrastructure.oracle
 
 import dk.cachet.rad.core.RadService
+import dk.cachet.rad.example.domain.oracle.AnswerRepository
 
 @RadService
 class OracleService (private val answerRepository: AnswerRepository) {

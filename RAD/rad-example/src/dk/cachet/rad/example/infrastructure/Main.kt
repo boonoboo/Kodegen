@@ -1,4 +1,4 @@
-package dk.cachet.rad.example.server
+package dk.cachet.rad.example.infrastructure
 
 import io.ktor.application.Application
 import io.ktor.application.call

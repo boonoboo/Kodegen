@@ -3,4 +3,4 @@ package dk.cachet.rad.example.domain.dice
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ComplexDiceRoll(val eyes: Int, val color: String)
+data class WonkyDice(val diceOne: Dice, val diceTwo: Dice)

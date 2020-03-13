@@ -137,20 +137,7 @@ class RadProcessor : AbstractProcessor() {
 
 		// TODO: If authentication is required from any service, install Authentication
 
-		// TODO: If content negotiation is necessary, install content negotiation
-		/*
-		val installMemberName = MemberName("io.ktor.application", "install")
-		val contentNegotiationMemberName = MemberName("io.ktor.features", "ContentNegotiation")
-		val serializationMemberName = MemberName("io.ktor.serialization", "serialization")
-		moduleFunctionBuilder
-			.beginControlFlow("%M(%M)", installMemberName, contentNegotiationMemberName)
-			.addStatement("%M()", serializationMemberName)
-			.endControlFlow()
-		*/
-
-
 		// Create service for calling service functions
-		// TODO: Consider cases with no service class / static class / class with parameterized constructor
 		val service = MemberName(servicePackage, serviceTypeSpec.name!!)
 		moduleFunctionBuilder.addStatement("val service = %M()", service)
 
@@ -241,6 +228,13 @@ class RadProcessor : AbstractProcessor() {
 		// Prepare FileSpec builder
 		val fileSpecBuilder = FileSpec.builder(targetPackage, "${serviceTypeSpec.name!!}Client")
 
+		// TODO: Generate Client
+		// Define name and package of generated class
+		val className = ClassName(targetPackage, "${serviceTypeSpec.name!!}Client")
+
+		// Create class builder and set data modifier
+		val classBuilder = TypeSpec.classBuilder(className)
+
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
@@ -298,7 +292,8 @@ class RadProcessor : AbstractProcessor() {
 				.addStatement("return response")
 
 			// 5th step: Add function to FileSpec builder
-			fileSpecBuilder.addFunction(clientFunctionBuilder.build())
+			classBuilder
+				.addFunction(clientFunctionBuilder.build())
 		}
 
 		// Build the file
@@ -306,6 +301,7 @@ class RadProcessor : AbstractProcessor() {
 		file.mkdir()
 
 		fileSpecBuilder
+			.addType(classBuilder.build())
 			.build()
 			.writeTo(file)
 	}

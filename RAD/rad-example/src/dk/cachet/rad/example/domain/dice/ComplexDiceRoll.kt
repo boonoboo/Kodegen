@@ -1,4 +1,4 @@
-package dk.cachet.rad.example.domain
+package dk.cachet.rad.example.domain.dice
 
 import kotlinx.serialization.Serializable
 

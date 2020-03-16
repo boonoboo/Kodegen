@@ -20,6 +20,7 @@ dependencies {
     // Ktor dependencies
     implementation("io.ktor:ktor-server-jetty:1.3.2")
     implementation("io.ktor:ktor-server-core:1.3.2")
+    implementation("ch.qos.logback:logback-classic:1.2.3")
 
     // Run kapt using the RAD project
     kapt(project(":rad"))

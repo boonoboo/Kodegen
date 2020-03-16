@@ -15,9 +15,9 @@ import javax.tools.Diagnostic
 
 @KotlinPoetMetadataPreview
 @AutoService(Processor::class)
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
+@SupportedSourceVersion(SourceVersion.RELEASE_13)
 @SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
-@SupportedAnnotationTypes("dk.cachet.rad.core.RadMethod")
+@SupportedAnnotationTypes("dk.cachet.rad.core.RadService")
 class RadProcessor : AbstractProcessor() {
 	companion object {
 		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
@@ -37,11 +37,7 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		// TODO: Restructure code generation so that end result is:
-		// TODO: For each service, generate Application.serviceNameModule
-		// TODO: For each module, add a single routing
-		// TODO: For each method in the service, add a post containing the RAD logic for this routing
-
+		// TODO: Generate serializer for each domain object
 		// TODO: Consider methods for splitting routing / modules, e.g. if authentication is necessary
 
 		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
@@ -65,12 +61,15 @@ class RadProcessor : AbstractProcessor() {
 			// This is necessary because using javax Annotation Processing and Kotlin Poet to derive parameter
 			// information for methods may result in use of Java types instead of Kotlin types,
 			// e.g. using java.lang.String instead of kotlin.String
+			// TODO: Implement use of a Class Inspector
+			//val serviceTypeSpec = serviceElement.toTypeSpec(ReflectiveClassInspector.create())
 			val serviceTypeSpec = serviceElement.toTypeSpec()
 
 			// Generate the request object, module and client
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+			//registerKoinDependency
 		}
 		return false
 	}
@@ -137,10 +136,29 @@ class RadProcessor : AbstractProcessor() {
 
 		// TODO: If authentication is required from any service, install Authentication
 
-		// Create service for calling service functions
+		// Create service for calling service functions using lazy injection
 		val service = MemberName(servicePackage, serviceTypeSpec.name!!)
-		moduleFunctionBuilder.addStatement("val service = %M()", service)
+		val inject = MemberName("org.koin.ktor.ext", "inject")
+		moduleFunctionBuilder.addStatement("val service: %M by %M()", service, inject)
 
+
+		/*
+		var serviceStatement = "val service = %M("
+		// For each parameter the service takes, add the parameter using the name of the parameter
+		if(serviceTypeSpec.primaryConstructor != null) {
+			serviceTypeSpec.primaryConstructor!!.parameters.forEach { parameter ->
+				serviceStatement = "$serviceStatement ${parameter.name}"
+				if (serviceTypeSpec.primaryConstructor!!.parameters.indexOf(parameter)
+					!= serviceTypeSpec.primaryConstructor!!.parameters.lastIndex
+				) {
+					serviceStatement = "$serviceStatement, "
+				}
+			}
+		}
+		serviceStatement = "$serviceStatement)"
+
+		moduleFunctionBuilder.addStatement(serviceStatement, service)
+		*/
 		// Initiate routing
 		val routingMemberName = MemberName("io.ktor.routing", "routing")
 		moduleFunctionBuilder
@@ -192,19 +210,31 @@ class RadProcessor : AbstractProcessor() {
 			}
 			resultStatement = "$resultStatement)"
 
-			// If the function to call is a suspended function, add an await to the function call
-			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
-				resultStatement = "await $resultStatement"
-			}
 			resultStatement = "val result = $resultStatement"
 
+			// 5th step: Serialize and return the result
+			val respond = MemberName("io.ktor.response", "respond")
+			val responseStatement = "%M.%M(result)"
+
+			// If the function to call is a suspended function, wrap the resultStatement and response in a "runBlocking" block
+			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
+				val runBlocking = MemberName("kotlinx.coroutines", "runBlocking")
+				moduleFunctionBuilder
+					.beginControlFlow("%M", runBlocking)
+			}
+
+			// Add the result and response statements
 			moduleFunctionBuilder
 				.addStatement(resultStatement)
+				.addStatement(responseStatement, call, respond)
 
-			// 5th step: Serialize and return the result
-			val respondMemberName = MemberName("io.ktor.response", "respond")
+			// If suspend, end the runBlocking block
+			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
+				moduleFunctionBuilder.endControlFlow()
+			}
+
+			// End the route block
 			moduleFunctionBuilder
-				.addStatement("%M.%M(result)", call, respondMemberName)
 				.endControlFlow()
 		}
 
@@ -228,22 +258,33 @@ class RadProcessor : AbstractProcessor() {
 		// Prepare FileSpec builder
 		val fileSpecBuilder = FileSpec.builder(targetPackage, "${serviceTypeSpec.name!!}Client")
 
-		// TODO: Generate Client
+		// Generate Client
 		// Define name and package of generated class
 		val className = ClassName(targetPackage, "${serviceTypeSpec.name!!}Client")
 
 		// Create class builder and set data modifier
 		val classBuilder = TypeSpec.classBuilder(className)
 
+		// Get superinterface of the service and add it to the client
+		// TODO: Consider how to handle services which implement multiple interfaces
+		//val superInterface = serviceTypeSpec.superinterfaces.values.first()
+		//classBuilder.addSuperinterface(superInterface!!::class)
+
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
 
 			// Create client function
-			val clientFunctionBuilder = FunSpec.builder("${funSpec.name}")
+			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
 				.addModifiers(KModifier.PUBLIC)
-				.addModifiers(KModifier.SUSPEND)
 				.returns(funSpec.returnType!!)
+
+			// If service interface declares the function suspendable, add suspend modifier
+			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
+				clientFunctionBuilder.addModifiers(KModifier.SUSPEND)
+			}
+
+
 
 			// For each parameter of the function, add them to the client function
 			funSpec.parameters.forEach { parameter ->
@@ -256,15 +297,28 @@ class RadProcessor : AbstractProcessor() {
 			clientFunctionBuilder
 				.addStatement("val client = %M()", httpClient)
 
-
-
 			// 3rd step: Make request
 			val post = MemberName("io.ktor.client.request", "post")
 			val url = MemberName("io.ktor.client.request", "url")
 			val returnType = funSpec.returnType!!
 
+			// If the function is not suspendable, wrap the network call in runBlocking
+			// and set response to the result of this
+			if(!funSpec.modifiers.contains(KModifier.SUSPEND)) {
+				val runBlocking = MemberName("kotlinx.coroutines", "runBlocking")
+				clientFunctionBuilder
+					.beginControlFlow("val response = %M", runBlocking)
+			}
+
+			// If the function is suspendable, set response to the result of the post call
+			var responseStatement = "client.%M<$returnType>"
+			if(funSpec.modifiers.contains((KModifier.SUSPEND)))
+			{
+				responseStatement = "val response = $responseStatement"
+			}
+
 			clientFunctionBuilder
-				.beginControlFlow("val response = client.%M<$returnType>", post)
+				.beginControlFlow(responseStatement, post)
 				.addStatement("%M(%S)", url, apiUrl)
 
 			// If the function call has any parameters, serialize a request object and add it
@@ -283,12 +337,22 @@ class RadProcessor : AbstractProcessor() {
 					.addStatement(bodyStatement)
 			}
 
+			// End the post block
 			clientFunctionBuilder
 				.endControlFlow()
+
+			// If the function is not suspendable, end the runBlocking block
+			if(!funSpec.modifiers.contains(KModifier.SUSPEND))
+			{
+				clientFunctionBuilder
+					.endControlFlow()
+			}
 
 			// 4th: step: Close the client and return the result
 			clientFunctionBuilder
 				.addStatement("client.close()")
+
+			clientFunctionBuilder
 				.addStatement("return response")
 
 			// 5th step: Add function to FileSpec builder
@@ -296,12 +360,33 @@ class RadProcessor : AbstractProcessor() {
 				.addFunction(clientFunctionBuilder.build())
 		}
 
+		// TODO: Add Koin module
+		// TODO: This should go in some configuration function that is always run
+		val koinModule = MemberName("org.koin.dsl", "module")
+		val koinModuleBuilder = FunSpec.builder("${serviceTypeSpec.name!!}TodoMoveSomewhereElse")
+			.beginControlFlow("val koinModule = %M", koinModule)
+			.addStatement("single { ${className.simpleName}() }")
+			.endControlFlow()
+
+		/*
+		val startKoin = MemberName("org.koin.core.context", "startKoin")
+
+		koinModuleBuilder
+			.beginControlFlow("%M", startKoin)
+
+		// modulesStatement = "modules(
+		// for each module..
+		//    modulesStatement += moduleName
+		//    modulesStatement += ", "
+		// modulesStatement += ")"
+		*/
 		// Build the file
 		val file = File(generatedSourcesRoot)
 		file.mkdir()
 
 		fileSpecBuilder
 			.addType(classBuilder.build())
+			.addFunction(koinModuleBuilder.build())
 			.build()
 			.writeTo(file)
 	}

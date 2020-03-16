@@ -6,15 +6,15 @@ import dk.cachet.rad.example.domain.dice.WonkyRoll
 import dk.cachet.rad.example.domain.dice.WonkyDice
 
 interface DiceService {
-    fun rollDice(): Roll
+    suspend fun rollDice(): Roll
 
-    fun rollCustomDice(dice: Dice): Roll
+    suspend fun rollCustomDice(dice: Dice): Roll
 
-    fun rollDices(rolls: Int): List<Roll>
+    suspend fun rollDices(rolls: Int): List<Roll>
 
-    fun rollCustomDices(dice: Dice, rolls: Int): List<Roll>
+    suspend fun rollCustomDices(dice: Dice, rolls: Int): List<Roll>
 
-    fun rollWonkyDice(wonkyDice: WonkyDice): WonkyRoll
+    suspend fun rollWonkyDice(wonkyDice: WonkyDice): WonkyRoll
 
-    fun rollWonkyDices(wonkyDice: WonkyDice, rolls: Int): List<WonkyRoll>
+    suspend fun rollWonkyDices(wonkyDice: WonkyDice, rolls: Int): List<WonkyRoll>
 }

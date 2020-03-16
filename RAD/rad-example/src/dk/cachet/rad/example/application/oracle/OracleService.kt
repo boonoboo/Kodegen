@@ -1,7 +1,8 @@
 package dk.cachet.rad.example.application.oracle
 
-interface OracleService {
-    fun ask8Ball(message: String): String
+import dk.cachet.rad.example.domain.oracle.Answer
 
-    fun askOracle(message: String): String
+interface OracleService {
+    suspend fun ask8Ball(message: String): String
+    suspend fun askOracle(message: String): Answer
 }

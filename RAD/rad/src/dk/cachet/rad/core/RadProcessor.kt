@@ -2,10 +2,13 @@ package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
+import com.squareup.kotlinpoet.classinspector.reflective.ReflectiveClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 
 import io.ktor.application.Application
+import org.koin.core.module.Module
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
@@ -15,12 +18,24 @@ import javax.tools.Diagnostic
 
 @KotlinPoetMetadataPreview
 @AutoService(Processor::class)
-@SupportedSourceVersion(SourceVersion.RELEASE_13)
-@SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
-@SupportedAnnotationTypes("dk.cachet.rad.core.RadService")
+//@SupportedSourceVersion(SourceVersion.RELEASE_13)
+//@SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
+//@SupportedAnnotationTypes("dk.cachet.rad.core.RadService")
 class RadProcessor : AbstractProcessor() {
 	companion object {
 		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
+	}
+
+	override fun getSupportedAnnotationTypes(): Set<String> {
+		return setOf("dk.cachet.rad.core.RadService", "dk.cachet.rad.core.RadAuthenticate")
+	}
+
+	override fun getSupportedSourceVersion(): SourceVersion {
+		return SourceVersion.latestSupported()
+	}
+
+	override fun getSupportedOptions(): Set<String> {
+		return setOf(KAPT_KOTLIN_GENERATED_OPTION_NAME)
 	}
 
 	/**
@@ -61,31 +76,24 @@ class RadProcessor : AbstractProcessor() {
 			// This is necessary because using javax Annotation Processing and Kotlin Poet to derive parameter
 			// information for methods may result in use of Java types instead of Kotlin types,
 			// e.g. using java.lang.String instead of kotlin.String
-			// TODO: Implement use of a Class Inspector
-			//val serviceTypeSpec = serviceElement.toTypeSpec(ReflectiveClassInspector.create())
-			val serviceTypeSpec = serviceElement.toTypeSpec()
+			// An ElementsClassInspector is used to assist in analyzing the classes when generating the TypeSpec
+			val classInspector = ElementsClassInspector.create(processingEnv.elementUtils, processingEnv.typeUtils)
+			val serviceTypeSpec = serviceElement.toTypeSpec(classInspector)
 
 			// Generate the request object, module and client
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-			//registerKoinDependency
 		}
 		return false
 	}
 
 	private fun generateRequestObjects(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
-		// TODO: Consider what target package should be
 		val targetPackage = "$servicePackage.rad"
 
-		// Iterate through the methods of the service, generating a request object for each
-		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			// TODO: Consider generating serializers for polymorphic / complex objects
-			// todo: where the @Serializable tag does not suffice
-
-			// If method takes no parameters, the request object is not necessary
-			if(funSpec.parameters.isEmpty()) return@forEach
-
+		// Iterate through all function of the service that has at least one parameter
+		// For each function, generate a request object
+		serviceTypeSpec.funSpecs.filter { funSpec -> funSpec.parameters.isNotEmpty() }.forEach { funSpec ->
 			// Define name and package of generated class
 			val className = ClassName(targetPackage, "${funSpec.name}Request")
 
@@ -99,7 +107,6 @@ class RadProcessor : AbstractProcessor() {
 			// Create constructor builder
 			val constructorBuilder = FunSpec.constructorBuilder()
 
-
 			funSpec.parameters.forEach { parameter ->
 				constructorBuilder.addParameter(parameter.name, parameter.type)
 				classBuilder.addProperty(
@@ -108,6 +115,22 @@ class RadProcessor : AbstractProcessor() {
 						.build()
 				)
 			}
+
+			// TODO: Generate serializers for polymorphic / complex objects,
+			//  use a @Serializable wrapper for all requests which
+			//  can use the serializer to serialize the domain object
+
+			// TODO
+			//   For each parameter, check if a serializer has been made for this type
+			//   If so, pass
+			//   If not, create an extension function:
+			//     Foo.Companion.fromJson(json: String): Foo =
+			//	     JSON.parse(json(), json)
+			//	 and:
+			//	   Foo.toJson(): String =
+			//	     JSON.stringify(Foo.json(), this)
+			//   Note: Requires that a JSON serializer has been made
+			//
 
 			// Set constructor and build the class
 			classBuilder
@@ -128,42 +151,20 @@ class RadProcessor : AbstractProcessor() {
 		val targetPackage = "$servicePackage.rad"
 
 		// Create module extension function for Application class
-		// TODO: Consider if one module for all services should be generated or one module per service
 		val moduleFunctionBuilder = FunSpec.builder("${serviceTypeSpec.name}Module")
 			.addModifiers(KModifier.PUBLIC)
 			.receiver(Application::class)
 			.returns(Unit::class)
-
-		// TODO: If authentication is required from any service, install Authentication
 
 		// Create service for calling service functions using lazy injection
 		val service = MemberName(servicePackage, serviceTypeSpec.name!!)
 		val inject = MemberName("org.koin.ktor.ext", "inject")
 		moduleFunctionBuilder.addStatement("val service: %M by %M()", service, inject)
 
-
-		/*
-		var serviceStatement = "val service = %M("
-		// For each parameter the service takes, add the parameter using the name of the parameter
-		if(serviceTypeSpec.primaryConstructor != null) {
-			serviceTypeSpec.primaryConstructor!!.parameters.forEach { parameter ->
-				serviceStatement = "$serviceStatement ${parameter.name}"
-				if (serviceTypeSpec.primaryConstructor!!.parameters.indexOf(parameter)
-					!= serviceTypeSpec.primaryConstructor!!.parameters.lastIndex
-				) {
-					serviceStatement = "$serviceStatement, "
-				}
-			}
-		}
-		serviceStatement = "$serviceStatement)"
-
-		moduleFunctionBuilder.addStatement(serviceStatement, service)
-		*/
 		// Initiate routing
 		val routingMemberName = MemberName("io.ktor.routing", "routing")
 		moduleFunctionBuilder
 			.beginControlFlow("%M {", routingMemberName)
-
 
 		// Iterate through functions in service, generating a route for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
@@ -175,8 +176,7 @@ class RadProcessor : AbstractProcessor() {
 			//  require unique function names
 			//  use a randomly generated UUID for each function
 			//  use a single URI endpoint only and place the function invocation in the body (RPC style)
-
-			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
+			val apiUrl = "/radApi/${funSpec.name}"
 			moduleFunctionBuilder
 				.beginControlFlow("%M(%S) {", post, apiUrl)
 
@@ -185,8 +185,6 @@ class RadProcessor : AbstractProcessor() {
 			val call = MemberName("io.ktor.application", "call")
 
 			if(funSpec.parameters.isNotEmpty()) {
-				// TODO: Currently no static check that ClassName is the same as in generated request object
-				//  The ClassName Reference should be reused
 				val requestClassName = ClassName("$servicePackage.rad", "${funSpec.name}Request")
 				val receive = MemberName("io.ktor.request", "receive")
 
@@ -267,8 +265,12 @@ class RadProcessor : AbstractProcessor() {
 
 		// Get superinterface of the service and add it to the client
 		// TODO: Consider how to handle services which implement multiple interfaces
-		//val superInterface = serviceTypeSpec.superinterfaces.values.first()
-		//classBuilder.addSuperinterface(superInterface!!::class)
+		val interfaceTypeName = serviceTypeSpec.superinterfaces.keys.firstOrNull()
+		if(interfaceTypeName != null) {
+			classBuilder.addSuperinterface(interfaceTypeName)
+		}
+
+
 
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
@@ -277,6 +279,7 @@ class RadProcessor : AbstractProcessor() {
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
 				.addModifiers(KModifier.PUBLIC)
+				.addModifiers(KModifier.OVERRIDE)
 				.returns(funSpec.returnType!!)
 
 			// If service interface declares the function suspendable, add suspend modifier
@@ -360,14 +363,21 @@ class RadProcessor : AbstractProcessor() {
 				.addFunction(clientFunctionBuilder.build())
 		}
 
-		// TODO: Add Koin module
-		// TODO: This should go in some configuration function that is always run
+		// Add companion object
+		val companionObjectBuilder = TypeSpec.companionObjectBuilder()
+
+		// Define function for getting Koin module with client service
 		val koinModule = MemberName("org.koin.dsl", "module")
-		val koinModuleBuilder = FunSpec.builder("${serviceTypeSpec.name!!}TodoMoveSomewhereElse")
-			.beginControlFlow("val koinModule = %M", koinModule)
+		val getKoinModuleBuilder = FunSpec.builder("getKoinModule")
+			.returns(Module::class)
+			.beginControlFlow("return %M", koinModule)
 			.addStatement("single { ${className.simpleName}() }")
 			.endControlFlow()
 
+		// Add function to companion object
+		companionObjectBuilder.addFunction(getKoinModuleBuilder.build())
+
+		classBuilder.addType(companionObjectBuilder.build())
 		/*
 		val startKoin = MemberName("org.koin.core.context", "startKoin")
 
@@ -380,13 +390,13 @@ class RadProcessor : AbstractProcessor() {
 		//    modulesStatement += ", "
 		// modulesStatement += ")"
 		*/
+
 		// Build the file
 		val file = File(generatedSourcesRoot)
 		file.mkdir()
 
 		fileSpecBuilder
 			.addType(classBuilder.build())
-			.addFunction(koinModuleBuilder.build())
 			.build()
 			.writeTo(file)
 	}

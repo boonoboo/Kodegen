@@ -11,13 +11,13 @@ kapt {
 }
 
 dependencies {
-    // Kotlin dependency
+    // Include Kotlin
     implementation(kotlin("stdlib"))
 
-    // RAD dependency
+    // Include Rad
     implementation(project(":rad"))
 
-    // Ktor dependencies
+    // Include Ktor features
     implementation("io.ktor:ktor-server-jetty:1.3.2")
     implementation("io.ktor:ktor-server-core:1.3.2")
     implementation("ch.qos.logback:logback-classic:1.2.3")

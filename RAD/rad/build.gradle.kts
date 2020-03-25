@@ -24,6 +24,9 @@ dependencies {
     api("org.koin:koin-core:2.1.3")
     api("org.koin:koin-ktor:2.1.3")
 
+    // Include gson
+    api("com.google.code.gson:gson:2.8.6")
+
     // Include AutoService
     implementation("com.google.auto.service:auto-service:1.0-rc6")
 
@@ -32,7 +35,6 @@ dependencies {
     implementation("com.squareup:kotlinpoet-metadata:1.5.0")
     implementation("com.squareup:kotlinpoet-metadata-specs:1.5.0")
     implementation("com.squareup:kotlinpoet-classinspector-elements:1.5.0")
-    implementation("com.squareup:kotlinpoet-classinspector-reflective:1.5.0")
 
     // Run Kapt
     kapt("com.google.auto.service:auto-service:1.0-rc6")

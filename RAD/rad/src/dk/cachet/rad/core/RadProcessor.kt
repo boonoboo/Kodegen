@@ -1,13 +1,14 @@
 package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
+import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
-import com.squareup.kotlinpoet.classinspector.reflective.ReflectiveClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 
 import io.ktor.application.Application
+import io.ktor.http.ContentType
 import org.koin.core.module.Module
 import java.io.File
 import javax.annotation.processing.*
@@ -39,7 +40,7 @@ class RadProcessor : AbstractProcessor() {
 	}
 
 	/**
-	 * Processes all elements annotated with "RadMethod"
+	 * Processes all elements annotated with "RadService"
 	 */
 	override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
 		// Check if generated source root exists, and if not, return with an error message
@@ -52,8 +53,7 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		// TODO: Generate serializer for each domain object
-		// TODO: Consider methods for splitting routing / modules, e.g. if authentication is necessary
+		val koinModulesList: MutableSet<MemberName> = mutableSetOf()
 
 		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
 			val serviceElement = it as TypeElement
@@ -84,6 +84,43 @@ class RadProcessor : AbstractProcessor() {
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+
+			koinModulesList.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName.toString()}Client"))
+			//generateSerialization(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+		}
+
+		// Avoid overwriting the configuration content if process is called again
+		// with no annotated elements
+		if(koinModulesList.size != 0) {
+			// Write file with configuration content
+			val file = File(generatedSourcesRoot)
+			file.mkdir()
+
+			// Configuration function
+			val koinModule = MemberName("org.koin.dsl", "module")
+
+
+			val configureRadBuilder = FunSpec.builder("configureRad")
+				.receiver(RadConfiguration::class)
+				.beginControlFlow("val module = %M", koinModule)
+
+			koinModulesList.forEach { serviceMemberName ->
+				configureRadBuilder.addStatement("single { %M() }", serviceMemberName)
+			}
+
+			configureRadBuilder.endControlFlow()
+
+			val startKoin = MemberName("org.koin.core.context", "startKoin")
+
+			configureRadBuilder
+				.beginControlFlow("%M", startKoin)
+				.addStatement("modules(module)")
+				.endControlFlow()
+
+			FileSpec.builder("dk.cachet.rad.core", "RadConfiguration")
+				.addFunction(configureRadBuilder.build())
+				.build()
+				.writeTo(file)
 		}
 		return false
 	}
@@ -95,10 +132,10 @@ class RadProcessor : AbstractProcessor() {
 		// For each function, generate a request object
 		serviceTypeSpec.funSpecs.filter { funSpec -> funSpec.parameters.isNotEmpty() }.forEach { funSpec ->
 			// Define name and package of generated class
-			val className = ClassName(targetPackage, "${funSpec.name}Request")
+			val serviceClassName = ClassName(targetPackage, "${funSpec.name}Request")
 
 			// Create class builder and set data modifier
-			val classBuilder = TypeSpec.classBuilder(className)
+			val classBuilder = TypeSpec.classBuilder(serviceClassName)
 				.addModifiers(KModifier.DATA)
 
 			// Add serializable annotation
@@ -116,21 +153,53 @@ class RadProcessor : AbstractProcessor() {
 				)
 			}
 
-			// TODO: Generate serializers for polymorphic / complex objects,
-			//  use a @Serializable wrapper for all requests which
-			//  can use the serializer to serialize the domain object
-
 			// TODO
-			//   For each parameter, check if a serializer has been made for this type
-			//   If so, pass
-			//   If not, create an extension function:
-			//     Foo.Companion.fromJson(json: String): Foo =
-			//	     JSON.parse(json(), json)
-			//	 and:
-			//	   Foo.toJson(): String =
-			//	     JSON.stringify(Foo.json(), this)
-			//   Note: Requires that a JSON serializer has been made
-			//
+			//   This has to be moved elsewhere so that both parameter types
+			//   and returned types have serializers generated
+			// Generate serializers for each non-primitive type used
+			funSpec.parameters.forEach serializationLoop@{ parameter ->
+				val type = parameter.type
+
+				// Check if extension function already exists or is unnecessary
+				// Current method is a temporary solution that makes an effort to not generate unnecessary serializers
+				// by ignoring types that are in the kotlin packages (primitives etc.)
+				// However, the method is flawed, and a better solution should be used
+				val className = ClassName.bestGuess(type.toString())
+				val classNameCompanion = className.nestedClass("Companion")
+				val defaultJsonMemberName = MemberName("dk.cachet.rad.serialization", "createDefaultJSON")
+				val serializerMemberName = MemberName("kotlinx.serialization", "serializer")
+
+				if(className.packageName == ("kotlin")) {
+					return@serializationLoop
+				}
+
+				//val jsonPropertyBuilder = PropertySpec.builder("JSON", Json::class)
+				//	.initializer("%M()", defaultJsonMemberName)
+
+				val fromJsonBuilder = FunSpec.builder("fromJson")
+					.receiver(classNameCompanion)
+					.returns(type)
+					.addParameter("json", String::class)
+					.addStatement("val JSON = %M()", defaultJsonMemberName)
+					.addStatement("return JSON.parse(%M(), json)", serializerMemberName)
+
+				val toJsonBuilder = FunSpec.builder("toJson")
+					.receiver(type)
+					.returns(String::class)
+					.addStatement("val JSON = %M()", defaultJsonMemberName)
+					.addStatement("return JSON.stringify($type.serializer(), this)")
+
+				// Build the file
+				val file = File(generatedSourcesRoot)
+				file.mkdir()
+
+				FileSpec.builder(targetPackage, "${type}Serialization")
+					//.addProperty(jsonPropertyBuilder.build())
+					.addFunction(fromJsonBuilder.build())
+					.addFunction(toJsonBuilder.build())
+					.build()
+					.writeTo(file)
+			}
 
 			// Set constructor and build the class
 			classBuilder
@@ -200,9 +269,9 @@ class RadProcessor : AbstractProcessor() {
 
 			// 4th step: Call the function
 			var resultStatement = "service.${funSpec.name}("
-			funSpec.parameters.forEach { parameter ->
+			funSpec.parameters.forEachIndexed { index, parameter ->
 				resultStatement = "$resultStatement${parameter.name}"
-				if (funSpec.parameters.indexOf(parameter) != funSpec.parameters.lastIndex) {
+				if (index != funSpec.parameters.lastIndex) {
 					resultStatement = "$resultStatement, "
 				}
 			}
@@ -274,7 +343,7 @@ class RadProcessor : AbstractProcessor() {
 
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			val apiUrl = "/radApi/${servicePackage.replace(".", "/")}/${funSpec.name}"
+			val apiUrl = "http://localhost:8080/radApi/${funSpec.name}"
 
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
@@ -283,10 +352,9 @@ class RadProcessor : AbstractProcessor() {
 				.returns(funSpec.returnType!!)
 
 			// If service interface declares the function suspendable, add suspend modifier
-			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
+			if (funSpec.modifiers.contains(KModifier.SUSPEND)) {
 				clientFunctionBuilder.addModifiers(KModifier.SUSPEND)
 			}
-
 
 
 			// For each parameter of the function, add them to the client function
@@ -300,6 +368,31 @@ class RadProcessor : AbstractProcessor() {
 			clientFunctionBuilder
 				.addStatement("val client = %M()", httpClient)
 
+			// 2nd step: Convert the body, if any, to JSON
+			val gson = MemberName("com.google.gson", "Gson")
+
+			clientFunctionBuilder
+				.addStatement("val gson = %M()", gson)
+
+			if(funSpec.parameters.isNotEmpty()) {
+				var jsonBodyStatement = "gson.toJson(${funSpec.name}Request("
+
+				funSpec.parameters.forEachIndexed { index, parameter ->
+					jsonBodyStatement = "$jsonBodyStatement${parameter.name} = ${parameter.name}"
+					if(index != funSpec.parameters.lastIndex) {
+						jsonBodyStatement = "$jsonBodyStatement, "
+					}
+				}
+				jsonBodyStatement = "$jsonBodyStatement))"
+
+				clientFunctionBuilder
+					.addStatement("val jsonBody = $jsonBodyStatement")
+
+				// TODO / DEBUG
+				clientFunctionBuilder.addStatement("println(jsonBody)")
+				// END DEBUG
+			}
+
 			// 3rd step: Make request
 			val post = MemberName("io.ktor.client.request", "post")
 			val url = MemberName("io.ktor.client.request", "url")
@@ -307,37 +400,26 @@ class RadProcessor : AbstractProcessor() {
 
 			// If the function is not suspendable, wrap the network call in runBlocking
 			// and set response to the result of this
-			if(!funSpec.modifiers.contains(KModifier.SUSPEND)) {
+			if (!funSpec.modifiers.contains(KModifier.SUSPEND)) {
 				val runBlocking = MemberName("kotlinx.coroutines", "runBlocking")
 				clientFunctionBuilder
 					.beginControlFlow("val response = %M", runBlocking)
 			}
 
 			// If the function is suspendable, set response to the result of the post call
-			var responseStatement = "client.%M<$returnType>"
-			if(funSpec.modifiers.contains((KModifier.SUSPEND)))
-			{
+			var responseStatement = "client.%M<String>"
+			if (funSpec.modifiers.contains((KModifier.SUSPEND))) {
 				responseStatement = "val response = $responseStatement"
 			}
 
+			// Set the URL and ContentType
 			clientFunctionBuilder
 				.beginControlFlow(responseStatement, post)
 				.addStatement("%M(%S)", url, apiUrl)
 
 			// If the function call has any parameters, serialize a request object and add it
-			if(funSpec.parameters.isNotEmpty())
-			{
-				var bodyStatement = "body = ${funSpec.name}Request("
-
-				funSpec.parameters.forEach { parameter ->
-					bodyStatement = "$bodyStatement${parameter.name} = ${parameter.name}"
-					if (funSpec.parameters.indexOf(parameter) != funSpec.parameters.lastIndex) {
-						bodyStatement = "$bodyStatement, "
-					}
-				}
-				bodyStatement = "$bodyStatement)"
-				clientFunctionBuilder
-					.addStatement(bodyStatement)
+			if (funSpec.parameters.isNotEmpty()) {
+				clientFunctionBuilder.addStatement("body = jsonBody")
 			}
 
 			// End the post block
@@ -345,18 +427,40 @@ class RadProcessor : AbstractProcessor() {
 				.endControlFlow()
 
 			// If the function is not suspendable, end the runBlocking block
-			if(!funSpec.modifiers.contains(KModifier.SUSPEND))
-			{
+			if (!funSpec.modifiers.contains(KModifier.SUSPEND)) {
 				clientFunctionBuilder
 					.endControlFlow()
 			}
 
-			// 4th: step: Close the client and return the result
+			// 4th: step: Close the client, parse the result and return it
 			clientFunctionBuilder
 				.addStatement("client.close()")
 
+			// TODO
+			//    If return type is parameterized, use a parameterized TypeToken, e.g.:
+			//    Gson().fromJson<List<Roll>>(response,
+			//          TypeToken.getParameterized(List::class.java, Roll::class.java).type)
+			if (returnType is ParameterizedTypeName) {
+				var resultStatement = "val result = gson.fromJson<$returnType>(response, %T.getParameterized(" +
+						"${returnType.rawType}::class.java, "
+
+				returnType.typeArguments.forEachIndexed { index, typeName ->
+					resultStatement = "$resultStatement${typeName}::class.java"
+					if (index != returnType.typeArguments.lastIndex) {
+						resultStatement = "$resultStatement, "
+					}
+				}
+				resultStatement = "$resultStatement).type)"
+
+				clientFunctionBuilder
+					.addStatement(resultStatement, TypeToken::class)
+			} else {
+				clientFunctionBuilder
+					.addStatement("val result = gson.fromJson<$returnType>(response, $returnType::class.java)")
+			}
+
 			clientFunctionBuilder
-				.addStatement("return response")
+				.addStatement("return result")
 
 			// 5th step: Add function to FileSpec builder
 			classBuilder

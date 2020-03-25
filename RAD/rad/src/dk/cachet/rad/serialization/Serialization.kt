@@ -19,5 +19,5 @@ fun createDefaultJSON( module: SerialModule = EmptyModule ): Json
 		// Therefore, continuing to use array polymorphism (as it was in older 'kotlinx.serialization' versions) is preferred.
 		useArrayPolymorphism = true )
 
-	return Json( configuration, module )
+	return Json(configuration, module)
 }

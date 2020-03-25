@@ -11,7 +11,8 @@ dependencies {
     implementation("org.koin:koin-core:2.1.3")
     implementation("org.koin:koin-ktor:2.1.3")
 
-    // Include rad-example
+    // Include rad and rad-example
+    implementation(project(":rad"))
     implementation(project(":rad-example"))
 }
 

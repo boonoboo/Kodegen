@@ -1,28 +1,28 @@
 package dk.cachet.rad.exampleclient
 
+import dk.cachet.rad.core.RadConfiguration
+import dk.cachet.rad.core.configureRad
 import dk.cachet.rad.example.application.dice.DiceService
+import dk.cachet.rad.example.domain.dice.Dice
+import dk.cachet.rad.example.domain.dice.WonkyDice
 import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceClient
 import kotlinx.coroutines.runBlocking
-import org.koin.core.KoinComponent
-import org.koin.core.inject
 
 fun main(args: Array<String>) {
-	// TODO
-	//   App should be some RAD-specific class that:
-	//     Creates a Koin configuration from all modules
-	//     Starts Koin
-
-	val app = App()
-	app.initialize()
+	val frontEndService = FrontEndService(DiceServiceClient())
+	frontEndService.doFrontendThing()
 }
 
-class App() : KoinComponent {
-	val diceService: DiceService by inject()
-
-	fun initialize() {
-		val diceRoll = runBlocking {
+class FrontEndService(val diceService: DiceService = DiceServiceClient())
+{
+	fun doFrontendThing() {
+		val roll = runBlocking {
 			diceService.rollDice()
 		}
-		print(diceRoll)
+		val wonkyRoll = runBlocking {
+			diceService.rollWonkyDice(WonkyDice(Dice(10), Dice(20)))
+		}
+		println(roll.eyes)
+		println("${wonkyRoll.rollOne} and ${wonkyRoll.rollTwo}")
 	}
 }

@@ -44,7 +44,7 @@ fun configureKoin() {
 	}
 
 	val oracleModule = module {
-		single { AnswerRepository() }
+		single<dk.cachet.rad.example.domain.oracle.AnswerRepository> { AnswerRepository() }
 		single { OracleService(get()) }
 	}
 

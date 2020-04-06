@@ -9,6 +9,7 @@ import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 
 import io.ktor.application.Application
 import io.ktor.http.ContentType
+import io.ktor.http.content.TextContent
 import org.koin.core.module.Module
 import java.io.File
 import javax.annotation.processing.*
@@ -84,9 +85,7 @@ class RadProcessor : AbstractProcessor() {
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-
 			koinModulesList.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName.toString()}Client"))
-			//generateSerialization(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 		}
 
 		// Avoid overwriting the configuration content if process is called again
@@ -98,7 +97,6 @@ class RadProcessor : AbstractProcessor() {
 
 			// Configuration function
 			val koinModule = MemberName("org.koin.dsl", "module")
-
 
 			val configureRadBuilder = FunSpec.builder("configureRad")
 				.receiver(RadConfiguration::class)
@@ -157,6 +155,7 @@ class RadProcessor : AbstractProcessor() {
 			//   This has to be moved elsewhere so that both parameter types
 			//   and returned types have serializers generated
 			// Generate serializers for each non-primitive type used
+			/*
 			funSpec.parameters.forEach serializationLoop@{ parameter ->
 				val type = parameter.type
 
@@ -200,6 +199,7 @@ class RadProcessor : AbstractProcessor() {
 					.build()
 					.writeTo(file)
 			}
+			*/
 
 			// Set constructor and build the class
 			classBuilder
@@ -387,10 +387,6 @@ class RadProcessor : AbstractProcessor() {
 
 				clientFunctionBuilder
 					.addStatement("val jsonBody = $jsonBodyStatement")
-
-				// TODO / DEBUG
-				clientFunctionBuilder.addStatement("println(jsonBody)")
-				// END DEBUG
 			}
 
 			// 3rd step: Make request
@@ -419,7 +415,7 @@ class RadProcessor : AbstractProcessor() {
 
 			// If the function call has any parameters, serialize a request object and add it
 			if (funSpec.parameters.isNotEmpty()) {
-				clientFunctionBuilder.addStatement("body = jsonBody")
+				clientFunctionBuilder.addStatement("body = %T(jsonBody, %T.Application.Json)", TextContent::class, ContentType::class)
 			}
 
 			// End the post block
@@ -436,10 +432,6 @@ class RadProcessor : AbstractProcessor() {
 			clientFunctionBuilder
 				.addStatement("client.close()")
 
-			// TODO
-			//    If return type is parameterized, use a parameterized TypeToken, e.g.:
-			//    Gson().fromJson<List<Roll>>(response,
-			//          TypeToken.getParameterized(List::class.java, Roll::class.java).type)
 			if (returnType is ParameterizedTypeName) {
 				var resultStatement = "val result = gson.fromJson<$returnType>(response, %T.getParameterized(" +
 						"${returnType.rawType}::class.java, "
@@ -467,34 +459,6 @@ class RadProcessor : AbstractProcessor() {
 				.addFunction(clientFunctionBuilder.build())
 		}
 
-		// Add companion object
-		val companionObjectBuilder = TypeSpec.companionObjectBuilder()
-
-		// Define function for getting Koin module with client service
-		val koinModule = MemberName("org.koin.dsl", "module")
-		val getKoinModuleBuilder = FunSpec.builder("getKoinModule")
-			.returns(Module::class)
-			.beginControlFlow("return %M", koinModule)
-			.addStatement("single { ${className.simpleName}() }")
-			.endControlFlow()
-
-		// Add function to companion object
-		companionObjectBuilder.addFunction(getKoinModuleBuilder.build())
-
-		classBuilder.addType(companionObjectBuilder.build())
-		/*
-		val startKoin = MemberName("org.koin.core.context", "startKoin")
-
-		koinModuleBuilder
-			.beginControlFlow("%M", startKoin)
-
-		// modulesStatement = "modules(
-		// for each module..
-		//    modulesStatement += moduleName
-		//    modulesStatement += ", "
-		// modulesStatement += ")"
-		*/
-
 		// Build the file
 		val file = File(generatedSourcesRoot)
 		file.mkdir()
@@ -503,5 +467,9 @@ class RadProcessor : AbstractProcessor() {
 			.addType(classBuilder.build())
 			.build()
 			.writeTo(file)
+	}
+
+	private fun generateSerialization() {
+
 	}
 }

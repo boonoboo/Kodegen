@@ -57,5 +57,5 @@ node_modules/
 libraries/tools/kotlin-test-js-runner/lib/
 libraries/tools/kotlin-source-map-loader/lib/
 local.properties
-/RAD/.idea/gradle.xml
-/RAD/.idea/compiler.xml
+/RAD/.idea/
+/RAD/.idea/

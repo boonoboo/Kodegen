@@ -1,5 +1,6 @@
 package dk.cachet.rad.example.infrastructure
 
+import dk.cachet.rad.example.infrastructure.shapes.ShapesService
 import dk.cachet.rad.example.infrastructure.dice.DiceService
 import dk.cachet.rad.example.infrastructure.oracle.AnswerRepository
 import dk.cachet.rad.example.infrastructure.oracle.OracleService
@@ -13,7 +14,6 @@ import io.ktor.routing.get
 import io.ktor.routing.routing
 import io.ktor.serialization.DefaultJsonConfiguration
 import io.ktor.serialization.SerializationConverter
-import io.ktor.serialization.json
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
@@ -48,7 +48,11 @@ fun configureKoin() {
 		single { OracleService(get()) }
 	}
 
+	val shapesModule = module {
+		single { ShapesService() }
+	}
+
 	startKoin {
-		modules(diceModule, oracleModule)
+		modules(diceModule, oracleModule, shapesModule)
 	}
 }

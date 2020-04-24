@@ -1,13 +1,13 @@
 package dk.cachet.rad.example.infrastructure.dice
 
 import kotlin.random.Random
-import dk.cachet.rad.core.*
 import dk.cachet.rad.example.application.dice.DiceService
 import dk.cachet.rad.example.domain.dice.Roll
 import dk.cachet.rad.example.domain.dice.Dice
 import dk.cachet.rad.example.domain.dice.WonkyRoll
 import dk.cachet.rad.example.domain.dice.WonkyDice
 import kotlinx.coroutines.runBlocking
+import dk.cachet.rad.core.RadService
 
 @RadService
 class DiceService : DiceService {

@@ -1,7 +1,6 @@
 package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
-import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.*
@@ -10,7 +9,7 @@ import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import io.ktor.application.Application
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
-import org.koin.core.module.Module
+import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
@@ -20,13 +19,14 @@ import javax.tools.Diagnostic
 
 @KotlinPoetMetadataPreview
 @AutoService(Processor::class)
-//@SupportedSourceVersion(SourceVersion.RELEASE_13)
-//@SupportedOptions(RadProcessor.KAPT_KOTLIN_GENERATED_OPTION_NAME)
-//@SupportedAnnotationTypes("dk.cachet.rad.core.RadService")
 class RadProcessor : AbstractProcessor() {
 	companion object {
 		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
 	}
+
+	val PRIMITIVE_TYPENAMES = setOf("kotlin.Char", "kotlin.String", "kotlin.Byte",
+		"kotlin.Short", "kotlin.Int", "kotlin.Long", "kotlin.Float", "kotlin.Double",
+		"kotlin.Boolean")
 
 	override fun getSupportedAnnotationTypes(): Set<String> {
 		return setOf("dk.cachet.rad.core.RadService", "dk.cachet.rad.core.RadAuthenticate")
@@ -54,7 +54,7 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		val koinModulesList: MutableSet<MemberName> = mutableSetOf()
+		val koinModules= mutableSetOf<MemberName>()
 
 		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
 			val serviceElement = it as TypeElement
@@ -68,9 +68,9 @@ class RadProcessor : AbstractProcessor() {
 			}
 
 			// Get the package of the service, which will be used when generating the associated API
-			// TODO: Consider if target package should be specified somehow, e.g. in the annotation
-			// todo: e.g. @RadPackage("org.example.api"), or if it should be inferred from the service,
-			// todo: e.g. org.example.domain -> org.example.domain.rad
+			// TODO: Consider logic for determining target package:
+			//   set in the annotation: @RadPackage("org.example.api")
+			//   inferred from the service: org.example.domain -> org.example.domain.rad
 			val servicePackage = processingEnv.elementUtils.getPackageOf(serviceElement).toString()
 
 			// Generate a KotlinPoet TypeSpec from the TypeClass, allowing Kotlin-specific information to be derived
@@ -81,45 +81,55 @@ class RadProcessor : AbstractProcessor() {
 			val classInspector = ElementsClassInspector.create(processingEnv.elementUtils, processingEnv.typeUtils)
 			val serviceTypeSpec = serviceElement.toTypeSpec(classInspector)
 
+			// TODO
+			//   If going with "iterate over service types" approach:
+			//   Iterate over all service type specs
+			//   For each type used, add it to the domainTypes Set
+			//   As a TypeSpec is needed, it may be necessary to get the elements from roundEnv,
+			//   and from there generate a TypeSpec for each
+
+			/*
+			serviceTypeSpec.funSpecs.forEach { funSpec ->
+				funSpec.parameters.forEach { parameter ->
+					// TODO
+					//  This might work?
+					val typeName = parameter.type
+					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Parameter TypeName: ${parameter.type}")
+					val typeElement = processingEnv.elementUtils.getAllTypeElements(parameter.type.toString()).first()
+					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Parameter TypeElement: ${typeElement}")
+					if(typeElement != null) {
+						val typeSpec = typeElement.toTypeSpec(classInspector)
+						domainTypes.add(Pair(typeName, typeSpec))
+					}
+				}
+				if(funSpec.returnType != null) {
+					val typeName = funSpec.returnType!!
+					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Return type: ${funSpec.returnType}")
+					val typeElement = processingEnv.elementUtils.getAllTypeElements(funSpec.returnType!!.toString()).first()
+					if(typeElement != null) {
+						val typeSpec = typeElement
+							.toTypeSpec(classInspector)
+						domainTypes.add(Pair(typeName, typeSpec))
+					}
+				}
+			}
+			*/
+
 			// Generate the request object, module and client
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-			koinModulesList.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName.toString()}Client"))
+			koinModules.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName}Client"))
 		}
 
-		// Avoid overwriting the configuration content if process is called again
-		// with no annotated elements
-		if(koinModulesList.size != 0) {
-			// Write file with configuration content
-			val file = File(generatedSourcesRoot)
-			file.mkdir()
-
-			// Configuration function
-			val koinModule = MemberName("org.koin.dsl", "module")
-
-			val configureRadBuilder = FunSpec.builder("configureRad")
-				.receiver(RadConfiguration::class)
-				.beginControlFlow("val module = %M", koinModule)
-
-			koinModulesList.forEach { serviceMemberName ->
-				configureRadBuilder.addStatement("single { %M() }", serviceMemberName)
-			}
-
-			configureRadBuilder.endControlFlow()
-
-			val startKoin = MemberName("org.koin.core.context", "startKoin")
-
-			configureRadBuilder
-				.beginControlFlow("%M", startKoin)
-				.addStatement("modules(module)")
-				.endControlFlow()
-
-			FileSpec.builder("dk.cachet.rad.core", "RadConfiguration")
-				.addFunction(configureRadBuilder.build())
-				.build()
-				.writeTo(file)
+		// Temporary fix
+		// Kapt seemingly calls "process" twice, but only iterates over the RadService annotations the first time
+		// To avoid overwriting the configuration if the process is called again,
+		// it is checked if the list of modules is empty, and if so, nothing is done
+		if (koinModules.isNotEmpty()) {
+			generateConfiguration(koinModules, generatedSourcesRoot)
 		}
+
 		return false
 	}
 
@@ -150,56 +160,6 @@ class RadProcessor : AbstractProcessor() {
 						.build()
 				)
 			}
-
-			// TODO
-			//   This has to be moved elsewhere so that both parameter types
-			//   and returned types have serializers generated
-			// Generate serializers for each non-primitive type used
-			/*
-			funSpec.parameters.forEach serializationLoop@{ parameter ->
-				val type = parameter.type
-
-				// Check if extension function already exists or is unnecessary
-				// Current method is a temporary solution that makes an effort to not generate unnecessary serializers
-				// by ignoring types that are in the kotlin packages (primitives etc.)
-				// However, the method is flawed, and a better solution should be used
-				val className = ClassName.bestGuess(type.toString())
-				val classNameCompanion = className.nestedClass("Companion")
-				val defaultJsonMemberName = MemberName("dk.cachet.rad.serialization", "createDefaultJSON")
-				val serializerMemberName = MemberName("kotlinx.serialization", "serializer")
-
-				if(className.packageName == ("kotlin")) {
-					return@serializationLoop
-				}
-
-				//val jsonPropertyBuilder = PropertySpec.builder("JSON", Json::class)
-				//	.initializer("%M()", defaultJsonMemberName)
-
-				val fromJsonBuilder = FunSpec.builder("fromJson")
-					.receiver(classNameCompanion)
-					.returns(type)
-					.addParameter("json", String::class)
-					.addStatement("val JSON = %M()", defaultJsonMemberName)
-					.addStatement("return JSON.parse(%M(), json)", serializerMemberName)
-
-				val toJsonBuilder = FunSpec.builder("toJson")
-					.receiver(type)
-					.returns(String::class)
-					.addStatement("val JSON = %M()", defaultJsonMemberName)
-					.addStatement("return JSON.stringify($type.serializer(), this)")
-
-				// Build the file
-				val file = File(generatedSourcesRoot)
-				file.mkdir()
-
-				FileSpec.builder(targetPackage, "${type}Serialization")
-					//.addProperty(jsonPropertyBuilder.build())
-					.addFunction(fromJsonBuilder.build())
-					.addFunction(toJsonBuilder.build())
-					.build()
-					.writeTo(file)
-			}
-			*/
 
 			// Set constructor and build the class
 			classBuilder
@@ -369,13 +329,13 @@ class RadProcessor : AbstractProcessor() {
 				.addStatement("val client = %M()", httpClient)
 
 			// 2nd step: Convert the body, if any, to JSON
-			val gson = MemberName("com.google.gson", "Gson")
+			val json = MemberName("kotlinx.serialization.json", "Json")
 
 			clientFunctionBuilder
-				.addStatement("val gson = %M()", gson)
+				.addStatement("val json = %M(%T.Stable)", json, JsonConfiguration::class)
 
 			if(funSpec.parameters.isNotEmpty()) {
-				var jsonBodyStatement = "gson.toJson(${funSpec.name}Request("
+				var jsonBodyStatement = "json.toJson(${funSpec.name}Request.serializer(), ${funSpec.name}Request("
 
 				funSpec.parameters.forEachIndexed { index, parameter ->
 					jsonBodyStatement = "$jsonBodyStatement${parameter.name} = ${parameter.name}"
@@ -386,7 +346,7 @@ class RadProcessor : AbstractProcessor() {
 				jsonBodyStatement = "$jsonBodyStatement))"
 
 				clientFunctionBuilder
-					.addStatement("val jsonBody = $jsonBodyStatement")
+					.addStatement("val jsonBody = $jsonBodyStatement.toString()")
 			}
 
 			// 3rd step: Make request
@@ -431,24 +391,65 @@ class RadProcessor : AbstractProcessor() {
 			// 4th: step: Close the client, parse the result and return it
 			clientFunctionBuilder
 				.addStatement("client.close()")
-
 			if (returnType is ParameterizedTypeName) {
-				var resultStatement = "val result = gson.fromJson<$returnType>(response, %T.getParameterized(" +
-						"${returnType.rawType}::class.java, "
+				// TODO
+				//   Parameterization currently only works one level deep
+				//   A recursive function should be made to check if a typeArgument is also parameterized
 
-				returnType.typeArguments.forEachIndexed { index, typeName ->
-					resultStatement = "$resultStatement${typeName}::class.java"
-					if (index != returnType.typeArguments.lastIndex) {
-						resultStatement = "$resultStatement, "
+				// TODO
+				//   When type is primitive, .serializer() must be imported from
+				//   kotlinx.serialization.builtins.PrimitiveSerializersKt
+				//   A naive way of doing this would be to check if returnType is equal to a Primitive
+				when (returnType.rawType) {
+					ClassName("kotlin.collections", "List") -> {
+						val list = MemberName("kotlinx.serialization.builtins", "list")
+						clientFunctionBuilder
+							.addStatement("val result = json.parse<$returnType>" +
+									"(${returnType.typeArguments.first()}.serializer().%M, response)", list)
+					}
+					ClassName("kotlin.collections", "Map") -> {
+						val map = MemberName("kotlinx.serialization.builtins", "map")
+						clientFunctionBuilder
+							.addStatement("val result = json.parse<$returnType>" +
+									"(${returnType.typeArguments.first()}.serializer().%M, response)", map)
+					}
+					ClassName("kotlin.collections", "Set") -> {
+						val set = MemberName("kotlinx.serialization.builtins", "set")
+						clientFunctionBuilder
+							.addStatement("val result = json.parse<$returnType>" +
+									"(${returnType.typeArguments.first()}.serializer().%M, response)", set)
+					}
+					else -> {
+						var resultStatement =
+							"val result = json.parse<$returnType>($returnType.serializer("
+
+						returnType.typeArguments.forEachIndexed { index, typeName ->
+							resultStatement = "$resultStatement${typeName}.serializer()"
+							if (index != returnType.typeArguments.lastIndex) {
+								resultStatement = "$resultStatement, "
+							}
+						}
+						resultStatement = "$resultStatement), response)"
+
+						clientFunctionBuilder
+							.addStatement(resultStatement)
 					}
 				}
-				resultStatement = "$resultStatement).type)"
-
-				clientFunctionBuilder
-					.addStatement(resultStatement, TypeToken::class)
 			} else {
-				clientFunctionBuilder
-					.addStatement("val result = gson.fromJson<$returnType>(response, $returnType::class.java)")
+				// TODO
+				//   DEBUG
+				if(returnType.toString() in PRIMITIVE_TYPENAMES) {
+					val serializer = MemberName("kotlinx.serialization.builtins", "serializer")
+
+					clientFunctionBuilder
+						.addStatement("val result = json.parse<$returnType>($returnType.%M(), response)", serializer)
+				}
+				else {
+					clientFunctionBuilder
+						.addStatement("val result = json.parse<$returnType>($returnType.serializer(), response)")
+				}
+				// TODO
+				//   END DEBUG
 			}
 
 			clientFunctionBuilder
@@ -469,7 +470,66 @@ class RadProcessor : AbstractProcessor() {
 			.writeTo(file)
 	}
 
-	private fun generateSerialization() {
+	private fun generateConfiguration(koinModules: MutableSet<MemberName>, generatedSourcesRoot: String) {
+		// Configuration function
+		val koinModule = MemberName("org.koin.dsl", "module")
 
+		val configureRadBuilder = FunSpec.builder("configureRad")
+			.receiver(RadConfiguration::class)
+			.beginControlFlow("val module = %M", koinModule)
+
+		koinModules.forEach { serviceMemberName ->
+			configureRadBuilder.addStatement("single { %M() }", serviceMemberName)
+		}
+
+		configureRadBuilder.endControlFlow()
+
+		val startKoin = MemberName("org.koin.core.context", "startKoin")
+
+		configureRadBuilder
+			.beginControlFlow("%M", startKoin)
+			.addStatement("modules(module)")
+			.endControlFlow()
+
+		// Write file with configuration content
+		val file = File(generatedSourcesRoot)
+		file.mkdir()
+
+		FileSpec.builder("dk.cachet.rad.core", "RadConfiguration")
+			.addFunction(configureRadBuilder.build())
+			.build()
+			.writeTo(file)
+
+	}
+
+	// TODO
+	//   INCOMPLETE
+	private fun getReturnTypeSerializer(returnType: ParameterizedTypeName): List<Pair<String, MemberName?>> {
+		val results = mutableListOf<Pair<String, MemberName?>>()
+		returnType.typeArguments.forEach { typeArgument ->
+			// If typeargument is also parameterized, call the function recursively to find inner serializers
+			if(typeArgument is ParameterizedTypeName) {
+				return getReturnTypeSerializer(typeArgument)
+			}
+			// TODO
+			//    Consider adding the .list, .map, .set to the end of existing serializer strings instead
+			//    e.g. if returnType is List -> typeArgument.append(".list")
+			// If TypeArgument is parameterized by list, map or set, use their special serializer
+			if (returnType.rawType == ClassName("kotlin.collections", "List")) {
+				val list = MemberName("kotlinx.serialization.builtins", "list")
+				results.add(Pair("${typeArgument}.serializer().%M)", list))
+			} else if (returnType.rawType == ClassName("kotlin.collections", "Map")) {
+				val map = MemberName("kotlinx.serialization.builtins", "map")
+				results.add(Pair("${typeArgument}.serializer().%M)", map))
+			} else if (returnType.rawType == ClassName("kotlin.collections", "Set")) {
+				val set = MemberName("kotlinx.serialization.builtins", "set")
+				results.add(Pair("${typeArgument}.serializer().%M)", set))
+			}
+			// Otherwise, return a normal serializer
+			else {
+				results.add(Pair("${typeArgument}.serializer()", null))
+			}
+		}
+		return results
 	}
 }

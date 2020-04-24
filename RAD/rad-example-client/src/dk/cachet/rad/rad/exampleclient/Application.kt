@@ -1,4 +1,4 @@
-package dk.cachet.rad.exampleclient
+package dk.cachet.rad.rad.exampleclient
 
 import dk.cachet.rad.example.application.devices.ShapesService
 import dk.cachet.rad.example.application.dice.DiceService
@@ -30,13 +30,13 @@ class FrontEndService(private val diceService: DiceService, private val oracleSe
 				oracleService.askOracle("Will this work?")
 			}
 
-			val deferredShape = GlobalScope.async {
-				shapesService.getRandomShape()
-			}
+			//val deferredShape = GlobalScope.async {
+			//	shapesService.getRandomShape()
+			//}
 
 			println("The roll was ${deferredRoll.await().eyes}")
 			println("The answer was \"${deferredAnswer.await().response}\" with a certainty of ${deferredAnswer.await().percentCertainty}")
-			val shape = deferredShape.await()
+			/*val shape = deferredShape.await()
 
 			if(shape is Circle) {
 				println("The shape is a Circle with area ${shape.getArea()}")
@@ -44,6 +44,7 @@ class FrontEndService(private val diceService: DiceService, private val oracleSe
 			else if (shape is Rectangle) {
 				println("The shape is a Rectangle with area ${shape.getArea()}")
 			}
+			 */
 		}
 	}
 }

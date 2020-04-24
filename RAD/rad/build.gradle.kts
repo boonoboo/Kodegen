@@ -3,6 +3,11 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     kotlin("kapt")
+    id("java-gradle-plugin")
+
+    // For publishing to local maven repository
+    `maven-publish`
+    java
 }
 
 kapt {
@@ -12,6 +17,10 @@ kapt {
 
 dependencies {
     implementation(kotlin("stdlib"))
+
+    // Include Gradle API
+    implementation(gradleApi())
+    implementation(localGroovy())
 
     // Include Ktor
     // Transitive dependencies to allow projects using RAD to access Ktor features
@@ -42,14 +51,31 @@ dependencies {
 
 sourceSets["main"].java.srcDir("src")
 
-// Create new Gradle task for processing Rad annotations
-tasks.register("rad") {
-    doLast {
-        println("Processing RAD annotations")
-    }
-}
-
 repositories {
     mavenCentral()
     jcenter()
+}
+
+gradlePlugin {
+    plugins {
+        create("rad") {
+            id = "dk.cachet.rad"
+            displayName = "RAD plugin"
+            description = "Autogenerate Ktor server modules and HTTP clients for application services."
+            implementationClass = "dk.cachet.rad.gradle.RadPlugin"
+        }
+    }
+}
+
+// For publishing to local maven repository
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "dk.cachet.rad"
+            artifactId = "rad"
+            version = "0.0.1"
+
+            from(components["java"])
+        }
+    }
 }

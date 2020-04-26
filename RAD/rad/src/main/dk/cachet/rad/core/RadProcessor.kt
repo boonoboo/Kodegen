@@ -2,6 +2,7 @@ package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
@@ -68,9 +69,6 @@ class RadProcessor : AbstractProcessor() {
 			}
 
 			// Get the package of the service, which will be used when generating the associated API
-			// TODO: Consider logic for determining target package:
-			//   set in the annotation: @RadPackage("org.example.api")
-			//   inferred from the service: org.example.domain -> org.example.domain.rad
 			val servicePackage = processingEnv.elementUtils.getPackageOf(serviceElement).toString()
 
 			// Generate a KotlinPoet TypeSpec from the TypeClass, allowing Kotlin-specific information to be derived
@@ -81,40 +79,6 @@ class RadProcessor : AbstractProcessor() {
 			val classInspector = ElementsClassInspector.create(processingEnv.elementUtils, processingEnv.typeUtils)
 			val serviceTypeSpec = serviceElement.toTypeSpec(classInspector)
 
-			// TODO
-			//   If going with "iterate over service types" approach:
-			//   Iterate over all service type specs
-			//   For each type used, add it to the domainTypes Set
-			//   As a TypeSpec is needed, it may be necessary to get the elements from roundEnv,
-			//   and from there generate a TypeSpec for each
-
-			/*
-			serviceTypeSpec.funSpecs.forEach { funSpec ->
-				funSpec.parameters.forEach { parameter ->
-					// TODO
-					//  This might work?
-					val typeName = parameter.type
-					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Parameter TypeName: ${parameter.type}")
-					val typeElement = processingEnv.elementUtils.getAllTypeElements(parameter.type.toString()).first()
-					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Parameter TypeElement: ${typeElement}")
-					if(typeElement != null) {
-						val typeSpec = typeElement.toTypeSpec(classInspector)
-						domainTypes.add(Pair(typeName, typeSpec))
-					}
-				}
-				if(funSpec.returnType != null) {
-					val typeName = funSpec.returnType!!
-					processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, "Return type: ${funSpec.returnType}")
-					val typeElement = processingEnv.elementUtils.getAllTypeElements(funSpec.returnType!!.toString()).first()
-					if(typeElement != null) {
-						val typeSpec = typeElement
-							.toTypeSpec(classInspector)
-						domainTypes.add(Pair(typeName, typeSpec))
-					}
-				}
-			}
-			*/
-
 			// Generate the request object, module and client
 			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
@@ -122,12 +86,14 @@ class RadProcessor : AbstractProcessor() {
 			koinModules.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName}Client"))
 		}
 
+		generateServerMain(generatedSourcesRoot)
+
 		// Temporary fix
 		// Kapt seemingly calls "process" twice, but only iterates over the RadService annotations the first time
 		// To avoid overwriting the configuration if the process is called again,
 		// it is checked if the list of modules is empty, and if so, nothing is done
 		if (koinModules.isNotEmpty()) {
-			generateConfiguration(koinModules, generatedSourcesRoot)
+			generateClientConfiguration(koinModules, generatedSourcesRoot)
 		}
 
 		return false
@@ -470,7 +436,69 @@ class RadProcessor : AbstractProcessor() {
 			.writeTo(file)
 	}
 
-	private fun generateConfiguration(koinModules: MutableSet<MemberName>, generatedSourcesRoot: String) {
+	// TODO
+	//   Generate server main function, containing:
+	//   Dependency injection configuration
+	//   Jetty engine function
+	//   Content negotiation installation
+	//   Authentication installation
+	private fun generateServerMain(generatedSourcesRoot: String) {
+		val applicationEngineEnvironment = MemberName("io.ktor.server.engine", "applicationEngineEnvironment")
+		val embeddedServer = MemberName("io.ktor.server.engine", "embeddedServer")
+		val jetty = MemberName("io.ktor.server.jetty", "Jetty")
+		val serverConnector = MemberName("org.eclipse.jetty.server", "ServerConnector")
+
+
+
+		val radMain = FunSpec.builder("radMain")
+			.addParameter("args", Array<Any>::class.parameterizedBy(String::class))
+
+		// Create the engine environment
+		radMain
+			.beginControlFlow("val environment = %M", applicationEngineEnvironment)
+			.beginControlFlow("module")
+		// For each module to register
+
+		// End module block
+		radMain.endControlFlow()
+
+		// End environment block
+		radMain.endControlFlow()
+
+		// Start the engine
+		radMain
+			.beginControlFlow("val server = %M(%M, environment)", embeddedServer, jetty)
+			.beginControlFlow("configureServer =")
+
+
+
+		// Set connector
+		// TODO
+		//   Only HTTP for now
+		//   Consider how to implement HTTPS
+		radMain.addStatement("this.addConnector(%M(this).apply { port = 80 })", serverConnector)
+
+		// End configureServer block
+		// End embeddedEngine block
+		radMain
+			.endControlFlow()
+			.endControlFlow()
+
+
+		// Start the engine
+		radMain.addStatement("server.start(wait = true)")
+
+
+		val file = File(generatedSourcesRoot)
+		file.mkdir()
+
+		FileSpec.builder("dk.cachet.rad.core", "RadEngine")
+			.addFunction(radMain.build())
+			.build()
+			.writeTo(file)
+	}
+
+	private fun generateClientConfiguration(koinModules: MutableSet<MemberName>, generatedSourcesRoot: String) {
 		// Configuration function
 		val koinModule = MemberName("org.koin.dsl", "module")
 
@@ -499,7 +527,6 @@ class RadProcessor : AbstractProcessor() {
 			.addFunction(configureRadBuilder.build())
 			.build()
 			.writeTo(file)
-
 	}
 
 	// TODO

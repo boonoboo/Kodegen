@@ -33,9 +33,6 @@ dependencies {
     api("org.koin:koin-core:2.1.3")
     api("org.koin:koin-ktor:2.1.3")
 
-    // Include gson
-    api("com.google.code.gson:gson:2.8.6")
-
     // Include AutoService
     implementation("com.google.auto.service:auto-service:1.0-rc6")
 

@@ -1,4 +1,4 @@
-package dk.cachet.rad.rad.exampleclient
+package dk.cachet.rad.example
 
 import dk.cachet.rad.example.application.shapes.ShapesService
 import dk.cachet.rad.example.application.dice.DiceService
@@ -12,7 +12,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 
 fun main(args: Array<String>) {
-	val frontEndService = FrontEndService(DiceServiceClient(), OracleServiceClient(), ShapesServiceClient())
+	val frontEndService = FrontEndService(
+		DiceServiceClient(),
+		OracleServiceClient(),
+		ShapesServiceClient()
+	)
 	frontEndService.doFrontendThing()
 }
 
@@ -28,21 +32,17 @@ class FrontEndService(private val diceService: DiceService, private val oracleSe
 				oracleService.askOracle("Will this work?")
 			}
 
+			val deferredRollPair = GlobalScope.async {
+				diceService.rollDiceAndDices(Pair(listOf(Dice(20), Dice(30)), Dice(10)))
+			}
+
 			//val deferredShape = GlobalScope.async {
 			//	shapesService.getRandomShape()
 			//}
 
 			println("The roll was ${deferredRoll.await().eyes}")
 			println("The answer was \"${deferredAnswer.await().response}\" with a certainty of ${deferredAnswer.await().percentCertainty}")
-			/*val shape = deferredShape.await()
-
-			if(shape is Circle) {
-				println("The shape is a Circle with area ${shape.getArea()}")
-			}
-			else if (shape is Rectangle) {
-				println("The shape is a Rectangle with area ${shape.getArea()}")
-			}
-			 */
+			println("The lone roll of the pair was ${deferredRollPair.await().second.eyes}.")
 		}
 	}
 }

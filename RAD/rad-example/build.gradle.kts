@@ -3,7 +3,6 @@ plugins {
     kotlin("kapt")
     kotlin("plugin.serialization")
     application
-    //id("dk.cachet.rad")
 }
 
 kapt {

@@ -1,9 +1,6 @@
 package dk.cachet.rad.example.application.dice
 
-import dk.cachet.rad.example.domain.dice.Roll
-import dk.cachet.rad.example.domain.dice.Dice
-import dk.cachet.rad.example.domain.dice.WonkyRoll
-import dk.cachet.rad.example.domain.dice.WonkyDice
+import dk.cachet.rad.example.domain.dice.*
 
 interface DiceService {
     suspend fun rollDice(): Roll
@@ -17,4 +14,10 @@ interface DiceService {
     suspend fun rollWonkyDice(wonkyDice: WonkyDice): WonkyRoll
 
     suspend fun rollWonkyDices(wonkyDice: WonkyDice, rolls: Int): List<WonkyRoll>
+
+    suspend fun rollVolatileDice(dice: Dice) : Roll
+
+    suspend fun rollMultipleDice(dices: List<Dice>): List<Roll>
+
+    suspend fun rollDiceAndDices(dices: Pair<List<Dice>, Dice>): Pair<List<Roll>, Roll>
 }

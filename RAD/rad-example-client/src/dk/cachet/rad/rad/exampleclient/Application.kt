@@ -1,11 +1,9 @@
 package dk.cachet.rad.rad.exampleclient
 
-import dk.cachet.rad.example.application.devices.ShapesService
+import dk.cachet.rad.example.application.shapes.ShapesService
 import dk.cachet.rad.example.application.dice.DiceService
 import dk.cachet.rad.example.application.oracle.OracleService
 import dk.cachet.rad.example.domain.dice.Dice
-import dk.cachet.rad.example.domain.shapes.Circle
-import dk.cachet.rad.example.domain.shapes.Rectangle
 import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceClient
 import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceClient
 import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceClient

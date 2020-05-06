@@ -1,4 +1,4 @@
-package dk.cachet.rad.example.application.devices
+package dk.cachet.rad.example.application.shapes
 
 import dk.cachet.rad.example.domain.shapes.Shape
 

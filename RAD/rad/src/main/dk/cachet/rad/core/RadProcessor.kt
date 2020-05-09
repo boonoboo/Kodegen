@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
+import dk.cachet.rad.serialization.ExceptionWrapper
 
 import io.ktor.application.Application
 import io.ktor.client.HttpClient
@@ -237,7 +238,8 @@ class RadProcessor : AbstractProcessor() {
 				.addStatement(responseStatement, call, respond)
 				.endControlFlow()
 				.beginControlFlow("catch (exception: %T)", Exception::class)
-				.addStatement("%M.%M(exception)", call, respond)
+				.addStatement("val exceptionWrapper = %T(exception)", ExceptionWrapper::class)
+				.addStatement("%M.%M(exceptionWrapper)", call, respond)
 				.endControlFlow()
 
 			// If suspend, end the runBlocking block

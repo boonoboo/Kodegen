@@ -3,7 +3,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     kotlin("kapt")
+    kotlin("plugin.serialization")
     id("java-gradle-plugin")
+
 
     // For publishing to local maven repository
     `maven-publish`

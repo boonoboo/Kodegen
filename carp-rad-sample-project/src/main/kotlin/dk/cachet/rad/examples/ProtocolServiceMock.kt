@@ -1,6 +1,5 @@
 package dk.cachet.rad.examples
 
-import dk.cachet.carp.common.UUID
 import dk.cachet.carp.protocols.application.ProtocolService
 import dk.cachet.carp.protocols.domain.*
 import dk.cachet.rad.core.RadService
@@ -15,7 +14,7 @@ class ProtocolServiceMock(val repository: StudyProtocolRepository) : ProtocolSer
      * @throws IllegalArgumentException when the [protocol] already exists.
      * @throws InvalidConfigurationError when [protocol] is invalid.
      */
-    override suspend fun add( protocol: StudyProtocolSnapshot, versionTag: String )
+    override suspend fun add(protocol: StudyProtocolSnapshot, versionTag: String )
     {
         val initializedProtocol = StudyProtocol.fromSnapshot( protocol )
         repository.add( initializedProtocol, versionTag )
@@ -43,7 +42,7 @@ class ProtocolServiceMock(val repository: StudyProtocolRepository) : ProtocolSer
      * @param versionTag The tag of the specific version of the protocol to return. The latest version is returned when not specified.
      * @throws IllegalArgumentException when the [owner], [protocolName], or [versionTag] does not exist.
      */
-    override suspend fun getBy( owner: ProtocolOwner, protocolName: String, versionTag: String? ): StudyProtocolSnapshot
+    override suspend fun getBy(owner: ProtocolOwner, protocolName: String, versionTag: String? ): StudyProtocolSnapshot
     {
         val protocol: StudyProtocol = repository.getBy( owner, protocolName, versionTag )
         return protocol.getSnapshot()

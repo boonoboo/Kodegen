@@ -1,8 +1,8 @@
 plugins {
     java
-    kotlin("jvm") version "1.3.72"
-    kotlin("kapt") version "1.3.72"
-    kotlin("plugin.serialization") version "1.3.72"
+    kotlin("jvm")
+    kotlin("kapt")
+    kotlin("plugin.serialization")
 }
 
 group = "dk.cachet.rad"

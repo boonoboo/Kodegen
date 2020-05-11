@@ -1,11 +1,7 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     kotlin("jvm")
     kotlin("kapt")
     kotlin("plugin.serialization")
-    id("java-gradle-plugin")
-
 
     // For publishing to local maven repository
     `maven-publish`
@@ -20,20 +16,16 @@ kapt {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    // Include Gradle API
-    implementation(gradleApi())
-    implementation(localGroovy())
-
     // Include Ktor
-    // Transitive dependencies to allow projects using RAD to access Ktor features
-    api("io.ktor:ktor-server-jetty:1.3.2")
+    // Transitive dependencies to allow projects using rad to access Ktor features
     api("io.ktor:ktor-client-core:1.3.2")
     api("io.ktor:ktor-client-apache:1.3.2")
     api("io.ktor:ktor-serialization:1.3.2")
+    api("io.ktor:ktor-auth:1.3.2")
 
-    // Include Koin
-    api("org.koin:koin-core:2.1.3")
-    api("org.koin:koin-ktor:2.1.3")
+    // Include serialization runtime
+    // Transitive dependency to allow projects using rad to use serialization
+    api("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
 
     // Include AutoService
     implementation("com.google.auto.service:auto-service:1.0-rc6")
@@ -55,21 +47,10 @@ repositories {
     jcenter()
 }
 
-gradlePlugin {
-    plugins {
-        create("rad") {
-            id = "dk.cachet.rad"
-            displayName = "RAD plugin"
-            description = "Autogenerate Ktor server modules and HTTP clients for application services."
-            implementationClass = "dk.cachet.rad.gradle.RadPlugin"
-        }
-    }
-}
-
 // For publishing to local maven repository
 publishing {
     publications {
-        create<MavenPublication>("maven") {
+        create<MavenPublication>("rad") {
             groupId = "dk.cachet.rad"
             artifactId = "rad"
             version = "0.0.1"

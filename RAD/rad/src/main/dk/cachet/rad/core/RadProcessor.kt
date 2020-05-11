@@ -2,7 +2,6 @@ package dk.cachet.rad.core
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
@@ -14,11 +13,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
-import kotlinx.serialization.modules.EmptyModule
-import kotlinx.serialization.modules.SerialModule
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
+import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
@@ -28,10 +26,6 @@ class RadProcessor : AbstractProcessor() {
 	companion object {
 		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
 	}
-
-	val PRIMITIVE_TYPENAMES = setOf("kotlin.Char", "kotlin.String", "kotlin.Byte",
-		"kotlin.Short", "kotlin.Int", "kotlin.Long", "kotlin.Float", "kotlin.Double",
-		"kotlin.Boolean")
 
 	override fun getSupportedAnnotationTypes(): Set<String> {
 		return setOf("dk.cachet.rad.core.RadService", "dk.cachet.rad.core.RadAuthenticate")
@@ -45,9 +39,9 @@ class RadProcessor : AbstractProcessor() {
 		return setOf(KAPT_KOTLIN_GENERATED_OPTION_NAME)
 	}
 
-	/**
-	 * Processes all elements annotated with "RadService"
-	 */
+	private val authenticatedMethods = mutableMapOf<Pair<String, String>, String>()
+
+	// Processes all elements annotated with "RadService"
 	override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
 		// Check if generated source root exists, and if not, return with an error message
 		val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
@@ -59,8 +53,15 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		val clientServiceMemberNames= mutableSetOf<MemberName>()
-		val serviceTypeSpecs = mutableSetOf<TypeSpec>()
+		// TODO
+		//   Prototype method-level authentication
+		//   Generate a map of methods annotated with RadAuthenticate and the schemes accepted for them
+		roundEnv.getElementsAnnotatedWith(RadAuthenticate::class.java).forEach { element ->
+			val methodElement = element as ExecutableElement
+			val authenticationSchemes = methodElement.getAnnotation(RadAuthenticate::class.java).authSchemes
+			val enclosingClass = methodElement.enclosingElement as TypeElement
+			authenticatedMethods[Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())] = authenticationSchemes.joinToString()
+		}
 
 		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
 			val serviceElement = it as TypeElement
@@ -77,29 +78,14 @@ class RadProcessor : AbstractProcessor() {
 			val serviceTypeSpec = serviceElement.toTypeSpec(classInspector)
 
 			// Generate the components
-			generateRequestObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-			generateModule(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-			generateClient(serviceTypeSpec, servicePackage, generatedSourcesRoot)
-			clientServiceMemberNames.add(MemberName("$servicePackage.rad", "${serviceElement.simpleName}Client"))
-			serviceTypeSpecs.add(serviceTypeSpec)
+			generateTransferObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+			generateServerEndpoint(serviceTypeSpec, servicePackage, generatedSourcesRoot)
+			generateServiceInvoker(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 		}
-
-		// Temporary fix
-		// Kapt seemingly calls "process" twice, but only iterates over the RadService annotations the first time
-		// To avoid overwriting the configuration if the process is called again,
-		// it is checked if the list of modules is empty, and if so, nothing is done
-		if (clientServiceMemberNames.isNotEmpty()) {
-			generateClientConfiguration(clientServiceMemberNames, generatedSourcesRoot)
-		}
-
-		if(serviceTypeSpecs.isNotEmpty()) {
-			generateServerMain(serviceTypeSpecs, generatedSourcesRoot)
-		}
-
 		return false
 	}
 
-	private fun generateRequestObjects(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+	private fun generateTransferObjects(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
 		val targetPackage = "$servicePackage.rad"
 		val fileName = "${serviceTypeSpec.name!!.capitalize()}RequestObjects"
 
@@ -112,8 +98,7 @@ class RadProcessor : AbstractProcessor() {
 		// For each function, generate a request object if it takes at least one parameter,
 		// and a response object if it has a return type
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			if(funSpec.parameters.isNotEmpty())
-			{
+			if(funSpec.parameters.isNotEmpty()) {
 				val requestObjectName = "${funSpec.name.capitalize()}Request"
 				// Define name and package of generated class
 				val serviceClassName = ClassName(targetPackage, requestObjectName)
@@ -159,19 +144,15 @@ class RadProcessor : AbstractProcessor() {
 			.writeTo(file)
 	}
 
-	private fun generateModule(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+	private fun generateServerEndpoint(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
 		val targetPackage = "$servicePackage.rad"
 
 		// Create module extension function for Application class
 		val moduleFunctionBuilder = FunSpec.builder("${serviceTypeSpec.name}Module")
 			.addModifiers(KModifier.PUBLIC)
+			.addParameter("service", ClassName(servicePackage, serviceTypeSpec.name!!))
 			.receiver(Application::class)
 			.returns(Unit::class)
-
-		// Create service for calling service functions using lazy injection
-		val service = MemberName(servicePackage, serviceTypeSpec.name!!)
-		val inject = MemberName("org.koin.ktor.ext", "inject")
-		moduleFunctionBuilder.addStatement("val service: %M by %M()", service, inject)
 
 		// Initiate routing
 		val routingMemberName = MemberName("io.ktor.routing", "routing")
@@ -183,9 +164,21 @@ class RadProcessor : AbstractProcessor() {
 			val requestObjectName = "${funSpec.name.capitalize()}Request"
 			// Create endpoint corresponding to the funSpec
 			// 1st step: Route on HTTP Method (POST)
+			// TODO
+			//   If method is in authenticatedMethods, wrap routing in authentication
+			//   if(authenticatedMethods.contains(thisMethod)
+			//   moduleFunctionBuilder.beginControLFlow("%M(...), authenticate)
+			//   ...
+			//   moduleFunctionBuilder.endControlFlow()
 			val post = MemberName("io.ktor.routing", "post")
+			val authenticate = MemberName("io.ktor.auth", "authenticate")
 
 			val apiUrl = "/radApi/${funSpec.name}"
+
+			if(authenticatedMethods.keys.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
+				moduleFunctionBuilder.beginControlFlow("%M(%S)", authenticate, authenticatedMethods[Pair(serviceTypeSpec.name, funSpec.name)]!!)
+			}
+
 			moduleFunctionBuilder
 				.beginControlFlow("%M(%S) {", post, apiUrl)
 
@@ -231,11 +224,24 @@ class RadProcessor : AbstractProcessor() {
 					.beginControlFlow("%M", runBlocking)
 			}
 
+			// TODO
+			//   Consider unit functions (no response object, no object to return)
+
 			// Add function call and response statements in try / catch block
 			moduleFunctionBuilder
 				.beginControlFlow("try")
 				.addStatement(resultStatement)
-				.addStatement(responseStatement, call, respond)
+
+			if(funSpec.returnType != null) {
+				moduleFunctionBuilder
+					.addStatement(responseStatement, call, respond)
+			}
+			else {
+				moduleFunctionBuilder
+					.addStatement("%M.%M(%M.OK)", call, respond, MemberName("io.ktor.http", "HttpStatusCode"))
+			}
+
+			moduleFunctionBuilder
 				.endControlFlow()
 				.beginControlFlow("catch (exception: %T)", Exception::class)
 				.addStatement("val exceptionWrapper = %T(exception)", ExceptionWrapper::class)
@@ -250,6 +256,11 @@ class RadProcessor : AbstractProcessor() {
 			// End the route block
 			moduleFunctionBuilder
 				.endControlFlow()
+
+			// If used, end the authenticate block
+			if(authenticatedMethods.keys.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
+				moduleFunctionBuilder.endControlFlow()
+			}
 		}
 
 		// End routing
@@ -266,7 +277,7 @@ class RadProcessor : AbstractProcessor() {
 			.writeTo(file)
 	}
 
-	private fun generateClient(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
+	private fun generateServiceInvoker(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
 		val targetPackage = "$servicePackage.rad"
 
 		// Prepare FileSpec builder
@@ -278,6 +289,26 @@ class RadProcessor : AbstractProcessor() {
 
 		// Create class builder and set data modifier
 		val classBuilder = TypeSpec.classBuilder(className)
+			.primaryConstructor(FunSpec.constructorBuilder()
+				.addParameter(ParameterSpec.builder("client", HttpClient::class)
+					.defaultValue("%T()", HttpClient::class)
+					.build())
+				.addParameter(ParameterSpec.builder("json", Json::class)
+					.defaultValue("Json(%T.Stable)", JsonConfiguration::class)
+					.build())
+				.addParameter(ParameterSpec.builder("baseUrl", String::class)
+					.build())
+				.build())
+			.addProperty(PropertySpec.builder("client", HttpClient::class)
+				.initializer("client")
+				.build())
+			.addProperty(PropertySpec.builder("json", Json::class)
+				.initializer("json")
+				.build())
+			.addProperty(PropertySpec.builder("baseUrl", String::class)
+				.initializer("baseUrl")
+				.build())
+
 
 		// Get superinterface of the service and add it to the client
 		// TODO: Consider how to handle services which implement multiple interfaces
@@ -286,33 +317,21 @@ class RadProcessor : AbstractProcessor() {
 			classBuilder.addSuperinterface(interfaceTypeName)
 		}
 
-		// Generate default serializer function and property with this value
-		classBuilder
-			.addProperty(PropertySpec.builder("json", Json::class)
-				.mutable()
-				.initializer("Json(%T.Stable)", JsonConfiguration::class)
-				.build())
-
-		classBuilder.addProperty(PropertySpec.builder("client", HttpClient::class)
-			.initializer("HttpClient()")
-			.build())
-
-		fun createDefaultJSON( module: SerialModule = EmptyModule ): Json
-		{
-			val configuration = JsonConfiguration.Stable.copy(useArrayPolymorphism = true)
-			return Json(configuration, module)
-		}
-
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			val apiUrl = "http://localhost:8080/radApi/${funSpec.name}"
+			val apiUrl = "\$baseUrl/radApi/${funSpec.name}"
 			val requestObjectName = "${funSpec.name.capitalize()}Request"
 
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
 				.addModifiers(KModifier.PUBLIC)
 				.addModifiers(KModifier.OVERRIDE)
-				.returns(funSpec.returnType!!)
+
+			if(funSpec.returnType != null)
+			{
+				clientFunctionBuilder
+					.returns(funSpec.returnType!!)
+			}
 
 			// If service interface declares the function suspendable, add suspend modifier
 			if (funSpec.modifiers.contains(KModifier.SUSPEND)) {
@@ -324,13 +343,6 @@ class RadProcessor : AbstractProcessor() {
 			funSpec.parameters.forEach { parameter ->
 				clientFunctionBuilder.addParameter(parameter)
 			}
-
-			// Create endpoint corresponding to the function
-			// 1st step: Open a HTTP client
-			// DEPRECATED
-			// val httpClient = MemberName("io.ktor.client", "HttpClient")
-			// clientFunctionBuilder
-			//	.addStatement("val client = %M()", httpClient)
 
 			// 2nd step: Convert the body, if any, to JSON
 			if(funSpec.parameters.isNotEmpty()) {
@@ -369,7 +381,7 @@ class RadProcessor : AbstractProcessor() {
 			// Set the URL and ContentType
 			clientFunctionBuilder
 				.beginControlFlow(responseStatement, post)
-				.addStatement("%M(%S)", url, apiUrl)
+				.addStatement("%M(%P)", url, apiUrl)
 
 			// If the function call has any parameters, serialize a request object and add it
 			if (funSpec.parameters.isNotEmpty()) {
@@ -387,24 +399,17 @@ class RadProcessor : AbstractProcessor() {
 			}
 
 			// 4th: step: Parse the result and return it
-			val responseType = "${funSpec.name.capitalize()}Response"
-
-			clientFunctionBuilder
-				.addStatement("val result = json.parse<$responseType>($responseType.serializer(), response).result")
-			/*
-			if (returnType is ParameterizedTypeName) {
-				val serializer = getReturnTypeSerializer(returnType)
+			if(funSpec.returnType != null) {
+				val responseType = "${funSpec.name.capitalize()}Response"
 
 				clientFunctionBuilder
-					.addStatement("val result = json.parse<$returnType>($serializer, response)")
-			} else {
-				clientFunctionBuilder
-					.addStatement("val result = json.parse<$returnType>($returnType.serializer(), response)")
+					.addStatement("val result = json.parse($responseType.serializer(), response).result")
+					.addStatement("return result")
+
 			}
-			*/
-			clientFunctionBuilder
-				.addStatement("return result")
-
+			else {
+				clientFunctionBuilder.addStatement("return")
+			}
 			// 5th step: Add function to FileSpec builder
 			classBuilder
 				.addFunction(clientFunctionBuilder.build())
@@ -418,195 +423,7 @@ class RadProcessor : AbstractProcessor() {
 		// Rather than through the use of MemberNames
 		fileSpecBuilder
 			.addType(classBuilder.build())
-			.addImport("kotlinx.serialization.builtins", "ArraySerializer")
-			.addImport("kotlinx.serialization.builtins", "ListSerializer")
-			.addImport("kotlinx.serialization.builtins", "SetSerializer")
-			.addImport("kotlinx.serialization.builtins", "MapSerializer")
-			.addImport("kotlinx.serialization.builtins", "PairSerializer")
-			.addImport("kotlinx.serialization.builtins", "TripleSerializer")
-			.addImport("kotlinx.serialization.builtins", "MapEntrySerializer")
-			.addImport("kotlinx.serialization.builtins", "serializer")
 			.build()
 			.writeTo(file)
-	}
-
-	// TODO
-	//   Generate server main function, containing:
-	//   Dependency injection configuration
-	//   Jetty engine function
-	//   Content negotiation installation
-	//   Authentication installation
-	private fun generateServerMain(serviceTypeSpecs: Set<TypeSpec>, generatedSourcesRoot: String) {
-		val applicationEngineEnvironment = MemberName("io.ktor.server.engine", "applicationEngineEnvironment")
-		val embeddedServer = MemberName("io.ktor.server.engine", "embeddedServer")
-		val jetty = MemberName("io.ktor.server.jetty", "Jetty")
-		val serverConnector = MemberName("org.eclipse.jetty.server", "ServerConnector")
-		val install = MemberName("io.ktor.application", "install")
-		val contentNegotiation = MemberName("io.ktor.features", "ContentNegotiation")
-		val contentType = MemberName("io.ktor.http", "ContentType")
-		val serializationConverter = MemberName("io.ktor.serialization", "SerializationConverter")
-		val json = MemberName("kotlinx.serialization.json", "Json")
-		val defaultJsonConfiguration = MemberName("io.ktor.serialization", "DefaultJsonConfiguration")
-		val koinModule = MemberName("org.koin.dsl", "module")
-		val startKoin = MemberName("org.koin.core.context", "startKoin")
-
-
-		// Main module (for installation of shared features) builder
-		val mainModule = FunSpec.builder("radMainModule")
-			.receiver(Application::class)
-
-		mainModule
-			.beginControlFlow("%M(%M)", install, contentNegotiation)
-			.addStatement("register(%M.Application.Json, %M(%M(%M)))",
-				contentType, serializationConverter, json, defaultJsonConfiguration)
-			.endControlFlow()
-
-		// Rad main function builder
-		val radMain = FunSpec.builder("radMain")
-			.addParameter("args", Array<Any>::class.parameterizedBy(String::class))
-
-		// Create the engine environment
-		radMain
-			.beginControlFlow("val environment = %M", applicationEngineEnvironment)
-			.beginControlFlow("module")
-			.addStatement("radMainModule()")
-
-		// TODO
-		//   Register each Ktor module
-		//services.forEach { serviceMemberName ->
-		//	radMain.addStatement("single { %M() }", serviceMemberName)
-		//}
-
-		// End module block
-		radMain.endControlFlow()
-
-		// End environment block
-		radMain.endControlFlow()
-
-		// TODO
-		//   Find a method to register the dependencies of each service
-		val toRegisterServices = mutableSetOf<TypeName>()
-		serviceTypeSpecs.forEach { typeSpec ->
-			typeSpec.primaryConstructor!!.parameters.forEach { parameter ->
-				toRegisterServices.add(parameter.type)
-			}
-		}
-
-		radMain
-			.beginControlFlow("val module = %M", koinModule)
-
-		toRegisterServices.forEach {
-			//radMain.addStatement("$it()")
-		}
-
-		// Start Koin
-		radMain
-			.endControlFlow()
-			.beginControlFlow("%M()", startKoin)
-			.addStatement("modules(module)")
-			.endControlFlow()
-
-		// Start the engine
-		radMain
-			.beginControlFlow("val server = %M(%M, environment)", embeddedServer, jetty)
-			.beginControlFlow("configureServer =")
-
-		// Set connector
-		// TODO
-		//   Only simple HTTP has been implemented
-		//   Consider how to integrate HTTPS (will require developer to link SSL certificate)
-		radMain.addStatement("this.addConnector(%M(this).apply { port = 80 })", serverConnector)
-
-		// End configureServer block
-		// End embeddedEngine block
-		radMain
-			.endControlFlow()
-			.endControlFlow()
-
-
-		// Start the engine
-		radMain.addStatement("server.start(wait = true)")
-
-
-		val file = File(generatedSourcesRoot)
-		file.mkdir()
-
-		FileSpec.builder("dk.cachet.rad.core", "RadEngine")
-			.addAliasedImport(koinModule, "koinModule")
-			.addFunction(mainModule.build())
-			.addFunction(radMain.build())
-			.build()
-			.writeTo(file)
-	}
-
-	private fun generateClientConfiguration(koinModules: MutableSet<MemberName>, generatedSourcesRoot: String) {
-		// Configuration function
-		val koinModule = MemberName("org.koin.dsl", "module")
-
-		val configureRadBuilder = FunSpec.builder("configureRad")
-			.beginControlFlow("val module = %M", koinModule)
-
-		koinModules.forEach { serviceMemberName ->
-			configureRadBuilder.addStatement("single { %M() }", serviceMemberName)
-		}
-
-		configureRadBuilder.endControlFlow()
-
-		val startKoin = MemberName("org.koin.core.context", "startKoin")
-
-		configureRadBuilder
-			.beginControlFlow("%M", startKoin)
-			.addStatement("modules(module)")
-			.endControlFlow()
-
-		// Write file with configuration content
-		val file = File(generatedSourcesRoot)
-		file.mkdir()
-
-		FileSpec.builder("dk.cachet.rad.core", "RadClientConfiguration")
-			.addFunction(configureRadBuilder.build())
-			.build()
-			.writeTo(file)
-	}
-
-	// TODO
-	//   Not tested: Multilevel parameterization
-	//   Tested and not working: Types parameterized with "Any"
-	private fun getReturnTypeSerializer(returnType: ParameterizedTypeName): String {
-		val result: String
-		var inner = ""
-		returnType.typeArguments.forEachIndexed { index, typeArgument ->
-			// If typeargument is also parameterized, call the function recursively to find inner serializers
-			if (typeArgument is ParameterizedTypeName) {
-				inner += getReturnTypeSerializer(typeArgument)
-			} else {
-				inner += "$typeArgument.serializer()"
-			}
-			if (index != returnType.typeArguments.lastIndex) {
-				inner += ", "
-			}
-		}
-		// If TypeArgument is parameterized by a class the requires use of builtin serializers,
-		// use this instead
-		if (returnType.rawType == ClassName("kotlin.collections", "List")) {
-			result = "ListSerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin.collections", "Map")) {
-			result = "MapSerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin.collections", "Set")) {
-			result = "SetSerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin", "Array")) {
-			result = "ArraySerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin", "Pair")) {
-			result = "PairSerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin", "Triple")) {
-			result = "TripleSerializer($inner)"
-		} else if (returnType.rawType == ClassName("kotlin.collections", "Map", "Entry")) {
-			result = "MapEntrySerializer($inner)"
-		}
-		// Otherwise, use normal .serializer()
-		else {
-			result = "${returnType}.serializer($inner)"
-		}
-		return result
 	}
 }

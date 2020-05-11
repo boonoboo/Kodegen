@@ -6,14 +6,15 @@ plugins {
 dependencies {
     // Include Kotlin
     implementation(kotlin("stdlib"))
-
-    // Include Koin
-    implementation("org.koin:koin-core:2.1.3")
-    implementation("org.koin:koin-ktor:2.1.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-common:1.3.4")
 
     // Include rad and rad-example
     implementation(project(":rad"))
     implementation(project(":rad-example"))
+
+    implementation("io.ktor:ktor-client-core:1.3.2")
+    implementation("io.ktor:ktor-client-apache:1.3.2")
+    implementation("io.ktor:ktor-client-auth-jvm:1.3.2")
 }
 
 sourceSets["main"].java.srcDir("src")

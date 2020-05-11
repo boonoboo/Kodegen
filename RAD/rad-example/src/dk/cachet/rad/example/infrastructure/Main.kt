@@ -1,20 +1,16 @@
 package dk.cachet.rad.example.infrastructure
 
-import dk.cachet.rad.core.radMain
-import dk.cachet.rad.example.infrastructure.dice.DiceService
-import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceModule
+import dk.cachet.rad.example.infrastructure.dice.DiceServiceImpl
+import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceImplModule
 import dk.cachet.rad.example.infrastructure.oracle.AnswerRepository
-import dk.cachet.rad.example.infrastructure.oracle.OracleService
-import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceModule
-import dk.cachet.rad.example.infrastructure.shapes.ShapesService
-import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceModule
+import dk.cachet.rad.example.infrastructure.oracle.OracleServiceImpl
+import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceImplModule
+import dk.cachet.rad.example.infrastructure.shapes.ShapesServiceImpl
+import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceImplModule
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
-import io.ktor.auth.Authentication
-import io.ktor.auth.UserIdPrincipal
-import io.ktor.auth.authenticate
-import io.ktor.auth.basic
+import io.ktor.auth.*
 import io.ktor.features.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.response.respondText
@@ -24,12 +20,9 @@ import io.ktor.serialization.DefaultJsonConfiguration
 import io.ktor.serialization.SerializationConverter
 import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.embeddedServer
-import io.ktor.server.jetty.EngineMain
 import io.ktor.server.jetty.Jetty
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.ServerConnector
-import org.koin.core.context.startKoin
-import org.koin.dsl.module
 
 // Sets the main function to the startup of a Jetty engine (i.e. boots up a HTTP server)
 // fun main(args: Array<String>): Unit = EngineMain.main(args)
@@ -38,13 +31,12 @@ import org.koin.dsl.module
 // fun main(args: Array<String>): Unit = radMain(args)
 
 fun main() {
-	configureKoin()
 	val environment = applicationEngineEnvironment {
 		module {
 			mainModule()
-			DiceServiceModule()
-			OracleServiceModule()
-			ShapesServiceModule()
+			DiceServiceImplModule(DiceServiceImpl())
+			OracleServiceImplModule(OracleServiceImpl(AnswerRepository()))
+			ShapesServiceImplModule(ShapesServiceImpl())
 		}
 	}
 	val server = embeddedServer(Jetty, environment) {
@@ -61,7 +53,7 @@ fun Application.mainModule(): Unit {
 
 	install(Authentication)
 	{
-		basic(name = "basicAuthentication") {
+		basic(name = "basic") {
 			realm = "SampleServer"
 			validate { credentials ->
 				if(credentials.name == "admin" && credentials.password == "adminP") {
@@ -75,29 +67,10 @@ fun Application.mainModule(): Unit {
 	}
 
 	routing {
-		authenticate("basicAuthentication") {
+		authenticate("basic") {
 			get("/") {
 				call.respondText("In root", contentType = ContentType.Text.Plain)
 			}
 		}
-	}
-}
-
-fun configureKoin() {
-	val diceModule = module {
-		single { DiceService() }
-	}
-
-	val oracleModule = module {
-		single<dk.cachet.rad.example.domain.oracle.AnswerRepository> { AnswerRepository() }
-		single { OracleService(get()) }
-	}
-
-	val shapesModule = module {
-		single { ShapesService() }
-	}
-
-	startKoin {
-		modules(diceModule, oracleModule, shapesModule)
 	}
 }

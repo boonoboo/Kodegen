@@ -5,16 +5,11 @@ plugins {
 }
 
 subprojects {
-    apply {
-        plugin("org.jetbrains.kotlin.jvm")
-        plugin("org.jetbrains.kotlin.kapt")
-    }
-
-    group = "dk.cachet.rad"
-    version = "0.0.1"
-
     repositories {
         jcenter()
         mavenCentral()
     }
+
+    group = "dk.cachet.rad"
+    version = "0.0.1"
 }

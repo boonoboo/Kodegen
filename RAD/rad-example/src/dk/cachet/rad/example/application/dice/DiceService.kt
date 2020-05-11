@@ -20,4 +20,8 @@ interface DiceService {
     suspend fun rollMultipleDice(dices: List<Dice>): List<Roll>
 
     suspend fun rollDiceAndDices(dices: Pair<List<Dice>, Dice>): Pair<List<Roll>, Roll>
+
+    suspend fun rollClassifiedDice(dice: Dice): Roll
+
+    suspend fun rollHiddenDice(dice: Dice)
 }

@@ -8,7 +8,7 @@ import dk.cachet.rad.example.domain.shapes.Shape
 import kotlin.random.Random
 
 @RadService
-class ShapesService : ShapesService {
+class ShapesServiceImpl : ShapesService {
 	override suspend fun getRandomShape(): Shape {
 		return when (Random.nextBoolean()) {
 			true -> Circle(Random.nextDouble(10.0))

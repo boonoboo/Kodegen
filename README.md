@@ -79,8 +79,8 @@ The ```RadAuthenticate``` annotation is used to authenticate specific endpoints 
 Adding the ```RadAuthenticate``` annotation to ```foo```:
 
 ```kotlin
-@RadAuthenticate(["basic", "digest])
-fun foo(bar: Baz) : Boolean
+@RadAuthenticate(["basic", "digest"])
+fun foo(bar: Baz): Qux
 {
     ...
 }

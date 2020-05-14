@@ -1,8 +1,6 @@
 package dk.cachet.rad.example.infrastructure.oracle
 
-import dk.cachet.rad.example.domain.oracle.Answer
 import dk.cachet.rad.example.domain.oracle.AnswerRepository
-import kotlin.random.Random
 
 class AnswerRepository : AnswerRepository {
 	companion object {

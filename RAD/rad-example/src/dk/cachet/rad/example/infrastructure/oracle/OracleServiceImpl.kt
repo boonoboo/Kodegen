@@ -12,7 +12,7 @@ class OracleServiceImpl (val answerRepository: AnswerRepository) : OracleService
         return answerRepository.getAnswer()
     }
 
-    suspend override fun askOracle(message: String): Answer {
+    override suspend fun askOracle(message: String): Answer {
         val answer = answerRepository.getAnswer()
         return Answer(answer, Random.nextInt(0,101))
     }

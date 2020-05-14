@@ -13,7 +13,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
+import kotlinx.serialization.json.JsonDecodingException
 import java.io.File
+import java.lang.IllegalStateException
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.ExecutableElement
@@ -53,9 +55,7 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		// TODO
-		//   Prototype method-level authentication
-		//   Generate a map of methods annotated with RadAuthenticate and the schemes accepted for them
+		//   Generate a map of methods annotated with RadAuthenticate and a comma-separated string of schemes accepted for them
 		roundEnv.getElementsAnnotatedWith(RadAuthenticate::class.java).forEach { element ->
 			val methodElement = element as ExecutableElement
 			val authenticationSchemes = methodElement.getAnnotation(RadAuthenticate::class.java).authSchemes
@@ -87,7 +87,7 @@ class RadProcessor : AbstractProcessor() {
 
 	private fun generateTransferObjects(serviceTypeSpec: TypeSpec, servicePackage: String, generatedSourcesRoot: String) {
 		val targetPackage = "$servicePackage.rad"
-		val fileName = "${serviceTypeSpec.name!!.capitalize()}RequestObjects"
+		val fileName = "${serviceTypeSpec.name!!.capitalize()}Objects"
 
 		val file = File(generatedSourcesRoot)
 		file.mkdir()
@@ -398,6 +398,14 @@ class RadProcessor : AbstractProcessor() {
 					.endControlFlow()
 			}
 
+			// Check if the content is an exception or the expected result
+			clientFunctionBuilder
+				.beginControlFlow("try")
+				.addStatement("val exception = json.parse(%T.serializer(), response)", ExceptionWrapper::class)
+				.addStatement("throw exception.innerException")
+				.endControlFlow()
+				.beginControlFlow("catch (exception: %T)", JsonDecodingException::class)
+
 			// 4th: step: Parse the result and return it
 			if(funSpec.returnType != null) {
 				val responseType = "${funSpec.name.capitalize()}Response"
@@ -405,11 +413,14 @@ class RadProcessor : AbstractProcessor() {
 				clientFunctionBuilder
 					.addStatement("val result = json.parse($responseType.serializer(), response).result")
 					.addStatement("return result")
-
 			}
 			else {
 				clientFunctionBuilder.addStatement("return")
 			}
+			clientFunctionBuilder
+				.endControlFlow()
+
+
 			// 5th step: Add function to FileSpec builder
 			classBuilder
 				.addFunction(clientFunctionBuilder.build())

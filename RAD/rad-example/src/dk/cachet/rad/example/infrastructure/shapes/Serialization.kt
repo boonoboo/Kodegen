@@ -19,4 +19,4 @@ val SHAPES_SERIAL_MODULE = SerializersModule {
 
 fun createShapesSerializer(module: SerialModule = EmptyModule): Json = Json(JsonConfiguration.Stable, SHAPES_SERIAL_MODULE + module)
 
-val JSON = createShapesSerializer()
+val json = createShapesSerializer()

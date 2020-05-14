@@ -6,22 +6,24 @@ import dk.cachet.rad.example.infrastructure.oracle.AnswerRepository
 import dk.cachet.rad.example.infrastructure.oracle.OracleServiceImpl
 import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceImplModule
 import dk.cachet.rad.example.infrastructure.shapes.ShapesServiceImpl
+import dk.cachet.rad.example.infrastructure.shapes.json
 import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceImplModule
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
-import io.ktor.auth.*
+import io.ktor.auth.Authentication
+import io.ktor.auth.UserIdPrincipal
+import io.ktor.auth.authenticate
+import io.ktor.auth.basic
 import io.ktor.features.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.response.respondText
 import io.ktor.routing.get
 import io.ktor.routing.routing
-import io.ktor.serialization.DefaultJsonConfiguration
 import io.ktor.serialization.SerializationConverter
 import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.jetty.Jetty
-import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.ServerConnector
 
 // Sets the main function to the startup of a Jetty engine (i.e. boots up a HTTP server)
@@ -48,7 +50,7 @@ fun main() {
 }
 fun Application.mainModule(): Unit {
 	install(ContentNegotiation) {
-		register(ContentType.Application.Json, SerializationConverter(Json(DefaultJsonConfiguration)))
+		register(ContentType.Application.Json, SerializationConverter(json))
 	}
 
 	install(Authentication)

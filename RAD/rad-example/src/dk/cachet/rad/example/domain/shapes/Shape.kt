@@ -1,4 +1,4 @@
-package dk.cachet.rad.example.domain.shapes;
+package dk.cachet.rad.example.domain.shapes
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Polymorphic

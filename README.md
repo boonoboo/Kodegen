@@ -6,31 +6,21 @@ RADDD is a library for generating Web APIs and API clients for Kotlin web servic
 
 ## Usage
 
-In your `build.gradle`, add RADDD to your plugins:
-
-```gradle
-plugins {
-    id 'dk.cachet.raddd' version '1.0.0'
-}
-```
-
-Then, add the `raddd` task to your dependencies:
+In your `build.gradle`, add rad to your dependencies:
 
 ```gradle
 dependencies {
-    raddd
-}
-````
-
-To configure RADDD, use the ```raddd``` task:
-
-```gradle
-raddd {
-    // Settings
-    generateWebApi = true
-    generateClient = true
+    implementation("dk.cachet.rad:rad:1.0.0")
 }
 ```
+
+To generate endpoints, add the dependencies using the kapt configuration:
+
+```gradle
+dependencies {
+    kapt("dk.cachet.rad:rad:1.0.0")
+}
+````
 
 ## Examples
 
@@ -39,98 +29,69 @@ raddd {
 Given the following function:
 
 ```kotlin
-@RADDDMethod
-fun createUser(userName: String, email: String) : Boolean
-{
-    ...
+@RadService
+class ExampleServiceImpl() : ExampleService {
+    override suspend fun foo(bar: Baz): Qux {
+        ...
+    }
 }
 ```
 
 RADDD will, on compilation, generate the following Ktor route:
 
 ```kotlin
-post("/api/createUser/") {
-    val request = call.receive<CreateUserRequest>()
-    val userName: String = request.userName
-    val email: String = email = request.email
-    val result = createUser(userName, email)
+post("/rad/foo/") {
+    val request = call.receive<FooRequest>()
+    val bar: Baz = request.bar
+    val result = foo(bar)
     call.respond(result)
 }
 ```
 
-and the following API client method:
+and the following client service invoker:
 
 ```kotlin
-suspend fun createUser(userName: String, email: String) : Boolean {
-    val client = HttpClient()
-    val response = client.post<Boolean>("api/createUser") {
-        body = json.write(CreateUserRequest(userName, email))
+class ExampleServiceImplInvoker(val client: HttpClient, val json: Json, val baseUrl: String) : ExampleService {
+    override suspend fun foo(bar: Baz): Qux {
+    val response = client.post<FooResponse>("api/foo") {
+        body = json.write(FooRequest(bar))
     }
-    client.close()
     return response.result
 }
 ```
 
-both of which use the following request object:
+using the following request and response objects:
 
 ```kotlin
-data class CreateUserRequest(val userName: String, val email: String)
+@Serializable
+data class FooRequest(val bar: Baz)
 ```
 
-### Authorisations
+```kotlin
+@Serializable
+data class FooResponse(val result: Qux)
+```
 
-Adding the ```RADDDAuthorize``` annotation to the ```createUser``` function with a list of allowed roles:
+
+### Authentication
+The ```RadAuthenticate``` annotation is used to authenticate specific endpoints using a Ktor authentication scheme.
+
+Adding the ```RadAuthenticate``` annotation to ```foo```:
 
 ```kotlin
-@RADDDMethod
-@RADDDAuthorize(["Admin", "Superuser"])
-fun createUser(userName: String, email: String) : Boolean
+@RadAuthenticate(["basic", "digest"])
+fun foo(bar: Baz): Qux
 {
     ...
 }
 ```
 
-causes RADDD to install the following Ktor authorisation:
+adds a requirement for authentication using the scheme ```"basic"``` or ```"digest"```:
 
 ```kotlin
-install(Authentication) {
-    basic(name = "Admin") {
-        realm = "Server"
-        validate { credentials -> ... }
+authenticate("basic", "digest") {
+    post("/rad/foo/") {
+        ...
     }
-}
-```
-
-This also modifies the Web API endpoint:
-
-```kotlin
-authenticate("Admin") {
-    post("/api/createUser/") {
-        val request = call.receive<CreateUserRequest>()
-        val userName: String = request.userName
-        val email: String = email = request.email
-        val result = createUser(userName, email)
-        call.respond(result)
-    }
-}
-```
-
-and the API client method:
-
-```kotlin
-suspend fun createUser(userName: String, email: String) : Boolean {
-    val client = HttpClient() {
-        install(Auth) {
-            basic {
-                ...
-            }
-        }
-    }
-
-    val response = client.post<Boolean>("api/createUser") {
-        body = json.write(CreateUserRequest(userName, email))
-    }
-    client.close()
-    return response.result
 }
 ```

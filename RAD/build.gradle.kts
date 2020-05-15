@@ -11,5 +11,5 @@ subprojects {
     }
 
     group = "dk.cachet.rad"
-    version = "0.0.1"
+    version = "1.0.0"
 }

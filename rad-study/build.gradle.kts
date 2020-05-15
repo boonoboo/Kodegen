@@ -6,8 +6,14 @@ plugins {
 
 subprojects {
     group = "dk.cachet.rad"
-    version = "1.0-SNAPSHOT"
+    version = "1.0.0"
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+    }
 }
 
 group = "dk.cachet.rad"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"

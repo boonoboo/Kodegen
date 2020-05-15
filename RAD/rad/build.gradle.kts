@@ -53,7 +53,7 @@ publishing {
         create<MavenPublication>("rad") {
             groupId = "dk.cachet.rad"
             artifactId = "rad"
-            version = "0.0.1"
+            version = "1.0.0"
 
             from(components["java"])
         }

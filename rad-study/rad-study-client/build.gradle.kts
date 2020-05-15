@@ -3,15 +3,6 @@ plugins {
     kotlin("plugin.serialization")
 }
 
-group = "dk.cachet.rad"
-version = "1.0-SNAPSHOT"
-
-repositories {
-    jcenter()
-    mavenLocal()
-    mavenCentral()
-}
-
 dependencies {
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.6")

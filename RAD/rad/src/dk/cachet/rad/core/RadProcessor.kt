@@ -164,12 +164,6 @@ class RadProcessor : AbstractProcessor() {
 			val requestObjectName = "${funSpec.name.capitalize()}Request"
 			// Create endpoint corresponding to the funSpec
 			// 1st step: Route on HTTP Method (POST)
-			// TODO
-			//   If method is in authenticatedMethods, wrap routing in authentication
-			//   if(authenticatedMethods.contains(thisMethod)
-			//   moduleFunctionBuilder.beginControLFlow("%M(...), authenticate)
-			//   ...
-			//   moduleFunctionBuilder.endControlFlow()
 			val post = MemberName("io.ktor.routing", "post")
 			val authenticate = MemberName("io.ktor.auth", "authenticate")
 
@@ -224,12 +218,8 @@ class RadProcessor : AbstractProcessor() {
 					.beginControlFlow("%M", runBlocking)
 			}
 
-			// TODO
-			//   Consider unit functions (no response object, no object to return)
-
-			// Add function call and response statements in try / catch block
+			// Add response statements
 			moduleFunctionBuilder
-				.beginControlFlow("try")
 				.addStatement(resultStatement)
 
 			if(funSpec.returnType != null) {
@@ -240,13 +230,6 @@ class RadProcessor : AbstractProcessor() {
 				moduleFunctionBuilder
 					.addStatement("%M.%M(%M.OK)", call, respond, MemberName("io.ktor.http", "HttpStatusCode"))
 			}
-
-			moduleFunctionBuilder
-				.endControlFlow()
-				.beginControlFlow("catch (exception: %T)", Exception::class)
-				.addStatement("val exceptionWrapper = %T(exception)", ExceptionWrapper::class)
-				.addStatement("%M.%M(exceptionWrapper)", call, respond)
-				.endControlFlow()
 
 			// If suspend, end the runBlocking block
 			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
@@ -398,14 +381,6 @@ class RadProcessor : AbstractProcessor() {
 					.endControlFlow()
 			}
 
-			// Check if the content is an exception or the expected result
-			clientFunctionBuilder
-				.beginControlFlow("try")
-				.addStatement("val exception = json.parse(%T.serializer(), response)", ExceptionWrapper::class)
-				.addStatement("throw exception.innerException")
-				.endControlFlow()
-				.beginControlFlow("catch (exception: %T)", JsonDecodingException::class)
-
 			// 4th: step: Parse the result and return it
 			if(funSpec.returnType != null) {
 				val responseType = "${funSpec.name.capitalize()}Response"
@@ -417,8 +392,6 @@ class RadProcessor : AbstractProcessor() {
 			else {
 				clientFunctionBuilder.addStatement("return")
 			}
-			clientFunctionBuilder
-				.endControlFlow()
 
 
 			// 5th step: Add function to FileSpec builder

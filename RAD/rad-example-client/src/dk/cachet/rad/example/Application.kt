@@ -8,6 +8,10 @@ import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceImplClient
 import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceImplClient
 import dk.cachet.rad.example.infrastructure.shapes.json
 import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceImplClient
+import io.ktor.client.HttpClient
+import io.ktor.client.features.ClientRequestException
+import io.ktor.client.features.HttpResponseValidator
+import io.ktor.client.features.RedirectResponseException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking

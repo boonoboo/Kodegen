@@ -1,11 +1,10 @@
-package dk.cachet.rad.core
+package dk.cachet.rad
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
 import com.squareup.kotlinpoet.metadata.*
 import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
-import dk.cachet.rad.serialization.ExceptionWrapper
 
 import io.ktor.application.Application
 import io.ktor.client.HttpClient
@@ -13,9 +12,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
-import kotlinx.serialization.json.JsonDecodingException
 import java.io.File
-import java.lang.IllegalStateException
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.ExecutableElement
@@ -30,7 +27,7 @@ class RadProcessor : AbstractProcessor() {
 	}
 
 	override fun getSupportedAnnotationTypes(): Set<String> {
-		return setOf("dk.cachet.rad.core.RadService", "dk.cachet.rad.core.RadAuthenticate")
+		return setOf("dk.cachet.rad.ApplicationService", "dk.cachet.rad.RequireAuthentication")
 	}
 
 	override fun getSupportedSourceVersion(): SourceVersion {
@@ -41,9 +38,8 @@ class RadProcessor : AbstractProcessor() {
 		return setOf(KAPT_KOTLIN_GENERATED_OPTION_NAME)
 	}
 
-	private val authenticatedMethods = mutableMapOf<Pair<String, String>, String>()
+	private val authenticatedMethods = mutableListOf<Pair<String, String>>()
 
-	// Processes all elements annotated with "RadService"
 	override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
 		// Check if generated source root exists, and if not, return with an error message
 		val generatedSourcesRoot: String = processingEnv.options[KAPT_KOTLIN_GENERATED_OPTION_NAME].orEmpty()
@@ -55,15 +51,15 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		//   Generate a map of methods annotated with RadAuthenticate and a comma-separated string of schemes accepted for them
-		roundEnv.getElementsAnnotatedWith(RadAuthenticate::class.java).forEach { element ->
+		//   Generate a list of methods annotated with RadAuthenticate
+		roundEnv.getElementsAnnotatedWith(RequireAuthentication::class.java).forEach { element ->
+			processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, element.simpleName)
 			val methodElement = element as ExecutableElement
-			val authenticationSchemes = methodElement.getAnnotation(RadAuthenticate::class.java).authSchemes
 			val enclosingClass = methodElement.enclosingElement as TypeElement
-			authenticatedMethods[Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())] = authenticationSchemes.joinToString()
+			authenticatedMethods += Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())
 		}
 
-		roundEnv.getElementsAnnotatedWith(RadService::class.java).forEach {
+		roundEnv.getElementsAnnotatedWith(ApplicationService::class.java).forEach {
 			val serviceElement = it as TypeElement
 
 			// Get the package of the service which will be used for the generated components
@@ -151,6 +147,9 @@ class RadProcessor : AbstractProcessor() {
 		val moduleFunctionBuilder = FunSpec.builder("${serviceTypeSpec.name}Module")
 			.addModifiers(KModifier.PUBLIC)
 			.addParameter("service", ClassName(servicePackage, serviceTypeSpec.name!!))
+			.addParameter(ParameterSpec.builder("authSchemes", String::class)
+				.addModifiers(KModifier.VARARG)
+				.build())
 			.receiver(Application::class)
 			.returns(Unit::class)
 
@@ -167,10 +166,10 @@ class RadProcessor : AbstractProcessor() {
 			val post = MemberName("io.ktor.routing", "post")
 			val authenticate = MemberName("io.ktor.auth", "authenticate")
 
-			val apiUrl = "/radApi/${funSpec.name}"
+			val apiUrl = "/radApi/${serviceTypeSpec.name!!.decapitalize()}/${funSpec.name}"
 
-			if(authenticatedMethods.keys.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
-				moduleFunctionBuilder.beginControlFlow("%M(%S)", authenticate, authenticatedMethods[Pair(serviceTypeSpec.name, funSpec.name)]!!)
+			if(authenticatedMethods.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
+				moduleFunctionBuilder.beginControlFlow("%M(*authSchemes)", authenticate)
 			}
 
 			moduleFunctionBuilder
@@ -211,13 +210,6 @@ class RadProcessor : AbstractProcessor() {
 			val respond = MemberName("io.ktor.response", "respond")
 			val responseStatement = "%M.%M($responseObjectName(result = result))"
 
-			// If the function to call is a suspended function, wrap the resultStatement and response in a "runBlocking" block
-			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
-				val runBlocking = MemberName("kotlinx.coroutines", "runBlocking")
-				moduleFunctionBuilder
-					.beginControlFlow("%M", runBlocking)
-			}
-
 			// Add response statements
 			moduleFunctionBuilder
 				.addStatement(resultStatement)
@@ -231,17 +223,12 @@ class RadProcessor : AbstractProcessor() {
 					.addStatement("%M.%M(%M.OK)", call, respond, MemberName("io.ktor.http", "HttpStatusCode"))
 			}
 
-			// If suspend, end the runBlocking block
-			if(funSpec.modifiers.contains(KModifier.SUSPEND)) {
-				moduleFunctionBuilder.endControlFlow()
-			}
-
 			// End the route block
 			moduleFunctionBuilder
 				.endControlFlow()
 
 			// If used, end the authenticate block
-			if(authenticatedMethods.keys.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
+			if(authenticatedMethods.contains(Pair(serviceTypeSpec.name, funSpec.name))) {
 				moduleFunctionBuilder.endControlFlow()
 			}
 		}
@@ -293,22 +280,20 @@ class RadProcessor : AbstractProcessor() {
 				.build())
 
 
-		// Get superinterface of the service and add it to the client
-		// TODO: Consider how to handle services which implement multiple interfaces
-		val interfaceTypeName = serviceTypeSpec.superinterfaces.keys.firstOrNull()
-		if(interfaceTypeName != null) {
-			classBuilder.addSuperinterface(interfaceTypeName)
-		}
+		// Extend the interface
+		// TODO: Disabled after changing @RadService to be used on interface rather than implementation
+		//  classBuilder.addSuperinterface(interfaceTypeName)
 
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			val apiUrl = "\$baseUrl/radApi/${funSpec.name}"
+			val apiUrl = "\$baseUrl/radApi/${serviceTypeSpec.name!!.decapitalize()}/${funSpec.name}"
 			val requestObjectName = "${funSpec.name.capitalize()}Request"
 
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
 				.addModifiers(KModifier.PUBLIC)
-				.addModifiers(KModifier.OVERRIDE)
+				// TODO: Override disabled as class does not extend interface
+				//.addModifiers(KModifier.OVERRIDE)
 
 			if(funSpec.returnType != null)
 			{

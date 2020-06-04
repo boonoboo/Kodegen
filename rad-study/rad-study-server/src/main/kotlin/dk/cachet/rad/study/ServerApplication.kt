@@ -1,7 +1,6 @@
-package dk.cachet.rad
+package dk.cachet.rad.study
 
-import dk.cachet.rad.infrastructure.SampleServiceImpl
-import dk.cachet.rad.infrastructure.rad.SampleServiceImplModule
+import dk.cachet.rad.study.rad.SampleServiceImplModule
 import io.ktor.application.Application
 import io.ktor.application.install
 import io.ktor.auth.Authentication
@@ -19,7 +18,7 @@ fun main() {
     val environment = applicationEngineEnvironment {
         module {
             mainModule()
-            SampleServiceImplModule(service = SampleServiceImpl())
+            SampleServiceImplModule(service = DateServiceImpl())
         }
         connector {
             host = "0.0.0.0"

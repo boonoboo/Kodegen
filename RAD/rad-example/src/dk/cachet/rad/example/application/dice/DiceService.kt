@@ -1,7 +1,10 @@
 package dk.cachet.rad.example.application.dice
 
+import dk.cachet.rad.ApplicationService
+import dk.cachet.rad.RequireAuthentication
 import dk.cachet.rad.example.domain.dice.*
 
+@ApplicationService
 interface DiceService {
     suspend fun rollDice(): Roll
 
@@ -21,6 +24,7 @@ interface DiceService {
 
     suspend fun rollDiceAndDices(dices: Pair<List<Dice>, Dice>): Pair<List<Roll>, Roll>
 
+    @RequireAuthentication
     suspend fun rollClassifiedDice(dice: Dice): Roll
 
     suspend fun rollHiddenDice(dice: Dice)

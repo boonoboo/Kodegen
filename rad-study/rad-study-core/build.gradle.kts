@@ -9,6 +9,10 @@ dependencies {
 
     implementation("dk.cachet.carp.protocols:carp.protocols.core-jvm:1.0.0-alpha.15")
 
-    implementation("dk.cachet.rad:rad:1.0.0")
-    kapt("dk.cachet.rad:rad:1.0.0")
+    implementation("dk.cachet:rad:1.0.1")
+    kapt("dk.cachet:rad:1.0.1")
+}
+
+kapt {
+    correctErrorTypes = true
 }

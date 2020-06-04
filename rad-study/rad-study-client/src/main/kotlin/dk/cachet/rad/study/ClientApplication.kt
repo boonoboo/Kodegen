@@ -1,11 +1,10 @@
-package dk.cachet.rad
+package dk.cachet.rad.study
 
-import dk.cachet.rad.infrastructure.rad.SampleServiceImplClient
+import dk.cachet.rad.study.rad.DateServiceImplClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.apache.Apache
 import io.ktor.client.features.auth.Auth
 import io.ktor.client.features.auth.providers.basic
-import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
@@ -17,12 +16,6 @@ fun main() {
 }
 
 class ClientApp {
-    private val serialModule = SerializersModule {
-
-    }
-
-    private val json = Json(JsonConfiguration.Stable, serialModule)
-
     private val client = HttpClient(Apache) {
         install(Auth) {
             basic {
@@ -32,13 +25,13 @@ class ClientApp {
         }
     }
 
-    private val sampleService = SampleServiceImplClient(client = client, json = json, baseUrl = "http://localhost:8080")
-
+    private val service = DateServiceImplClient(client = client, baseUrl = "http://localhost:8080")
 
     fun runApp() {
-        val eyes = runBlocking {
-            sampleService.rollAuthenticatedDice(10)
+        val date = runBlocking {
+            service.getDate()
         }
-        println(eyes)
+
+        println("The date today is: ${date}")
     }
 }

@@ -51,9 +51,9 @@ repositories {
 publishing {
     publications {
         create<MavenPublication>("rad") {
-            groupId = "dk.cachet.rad"
+            groupId = "dk.cachet"
             artifactId = "rad"
-            version = "1.0.0"
+            version = "1.0.1"
 
             from(components["java"])
         }

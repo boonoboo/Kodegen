@@ -1,13 +1,11 @@
 package dk.cachet.rad.example.infrastructure.dice
 
-import dk.cachet.rad.core.RadAuthenticate
+import dk.cachet.rad.RequireAuthentication
 import kotlin.random.Random
 import dk.cachet.rad.example.application.dice.DiceService
 import kotlinx.coroutines.runBlocking
-import dk.cachet.rad.core.RadService
 import dk.cachet.rad.example.domain.dice.*
 
-@RadService
 class DiceServiceImpl : DiceService {
     override suspend fun rollDice(): Roll {
         val dice = Dice(facets = 6)
@@ -54,7 +52,6 @@ class DiceServiceImpl : DiceService {
         return Pair(dices.first.map { dice -> rollCustomDice(dice) }, rollCustomDice(dices.second))
     }
 
-    @RadAuthenticate(["basic"])
     override suspend fun rollClassifiedDice(dice: Dice): Roll {
         return rollCustomDice(dice)
     }

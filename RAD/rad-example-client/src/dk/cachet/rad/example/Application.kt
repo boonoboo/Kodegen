@@ -1,33 +1,26 @@
 package dk.cachet.rad.example
 
-import dk.cachet.rad.example.application.dice.DiceService
-import dk.cachet.rad.example.application.oracle.OracleService
-import dk.cachet.rad.example.application.shapes.ShapesService
+import dk.cachet.rad.example.application.dice.rad.DiceServiceClient
+import dk.cachet.rad.example.application.oracle.rad.OracleServiceClient
+import dk.cachet.rad.example.application.shapes.rad.ShapesServiceClient
 import dk.cachet.rad.example.domain.dice.Dice
-import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceImplClient
-import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceImplClient
 import dk.cachet.rad.example.infrastructure.shapes.json
-import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceImplClient
-import io.ktor.client.HttpClient
-import io.ktor.client.features.ClientRequestException
-import io.ktor.client.features.HttpResponseValidator
-import io.ktor.client.features.RedirectResponseException
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 
 fun main() {
 	val frontEndService = FrontEndService(
-		DiceServiceImplClient(baseUrl = "http://localhost:8080"),
-		OracleServiceImplClient(baseUrl = "http://localhost:8080"),
-		ShapesServiceImplClient(json = json, baseUrl = "http://localhost:8080")
+		DiceServiceClient(baseUrl = "http://localhost:8080"),
+		OracleServiceClient(baseUrl = "http://localhost:8080"),
+		ShapesServiceClient(json = json, baseUrl = "http://localhost:8080")
 	)
 	frontEndService.doFrontendThing()
 }
 
-class FrontEndService(private val diceService: DiceService,
-					  private val oracleService: OracleService,
-					  private val shapesService: ShapesService) {
+class FrontEndService(private val diceService: DiceServiceClient,
+					  private val oracleService: OracleServiceClient,
+					  private val shapesService: ShapesServiceClient) {
 	fun doFrontendThing() {
 		runBlocking {
 			val deferredAnswer = GlobalScope.async {

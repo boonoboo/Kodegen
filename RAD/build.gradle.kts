@@ -10,6 +10,6 @@ subprojects {
         mavenCentral()
     }
 
-    group = "dk.cachet.rad"
-    version = "1.0.0"
+    group = "dk.cachet"
+    version = "1.0.1"
 }

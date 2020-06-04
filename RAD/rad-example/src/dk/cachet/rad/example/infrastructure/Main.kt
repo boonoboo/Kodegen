@@ -1,13 +1,13 @@
 package dk.cachet.rad.example.infrastructure
 
+import dk.cachet.rad.example.application.dice.rad.DiceServiceModule
+import dk.cachet.rad.example.application.oracle.rad.OracleServiceModule
+import dk.cachet.rad.example.application.shapes.rad.ShapesServiceModule
 import dk.cachet.rad.example.infrastructure.dice.DiceServiceImpl
-import dk.cachet.rad.example.infrastructure.dice.rad.DiceServiceImplModule
 import dk.cachet.rad.example.infrastructure.oracle.AnswerRepository
 import dk.cachet.rad.example.infrastructure.oracle.OracleServiceImpl
-import dk.cachet.rad.example.infrastructure.oracle.rad.OracleServiceImplModule
 import dk.cachet.rad.example.infrastructure.shapes.ShapesServiceImpl
 import dk.cachet.rad.example.infrastructure.shapes.json
-import dk.cachet.rad.example.infrastructure.shapes.rad.ShapesServiceImplModule
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
@@ -16,6 +16,7 @@ import io.ktor.auth.UserIdPrincipal
 import io.ktor.auth.authenticate
 import io.ktor.auth.basic
 import io.ktor.features.ContentNegotiation
+import io.ktor.features.NotFoundException
 import io.ktor.features.StatusPages
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -40,9 +41,9 @@ fun main() {
 	val environment = applicationEngineEnvironment {
 		module {
 			mainModule()
-			DiceServiceImplModule(DiceServiceImpl())
-			OracleServiceImplModule(OracleServiceImpl(AnswerRepository()))
-			ShapesServiceImplModule(ShapesServiceImpl())
+			DiceServiceModule(DiceServiceImpl())
+			OracleServiceModule(OracleServiceImpl(AnswerRepository()))
+			ShapesServiceModule(ShapesServiceImpl())
 		}
 	}
 	val server = embeddedServer(Jetty, environment) {
@@ -73,8 +74,11 @@ fun Application.mainModule(): Unit {
 	}
 
 	install(StatusPages) {
-		exception<IllegalArgumentException> { cause ->
+		exception<IllegalArgumentException> {
 			call.respond(HttpStatusCode.BadRequest)
+		}
+		exception<NoSuchElementException> {
+			call.respond(HttpStatusCode.NotFound)
 		}
 	}
 

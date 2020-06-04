@@ -1,12 +1,11 @@
 package dk.cachet.rad.example.infrastructure.oracle
 
-import dk.cachet.rad.core.RadService
+import dk.cachet.rad.ApplicationService
 import dk.cachet.rad.example.application.oracle.OracleService
 import dk.cachet.rad.example.domain.oracle.Answer
 import dk.cachet.rad.example.domain.oracle.AnswerRepository
 import kotlin.random.Random
 
-@RadService
 class OracleServiceImpl (val answerRepository: AnswerRepository) : OracleService {
     override suspend fun ask8Ball(message: String): String {
         return answerRepository.getAnswer()

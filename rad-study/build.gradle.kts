@@ -6,7 +6,7 @@ plugins {
 
 subprojects {
     group = "dk.cachet"
-    version = "1.0.1"
+    version = "1.0.2"
 
     repositories {
         // Include the local repository containing rad-1.0.1
@@ -19,4 +19,4 @@ subprojects {
 }
 
 group = "dk.cachet"
-version = "1.0.1"
+version = "1.0.2"

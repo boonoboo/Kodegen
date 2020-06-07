@@ -10,8 +10,8 @@ dependencies {
 
     api("dk.cachet.carp.protocols:carp.protocols.core-jvm:1.0.0-alpha.15")
 
-    implementation("dk.cachet:rad:1.0.1")
-    kapt("dk.cachet:rad:1.0.1")
+    implementation("dk.cachet:rad:1.0.2")
+    kapt("dk.cachet:rad:1.0.2")
 }
 
 kapt {

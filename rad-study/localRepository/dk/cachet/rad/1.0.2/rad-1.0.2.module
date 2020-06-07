@@ -3,7 +3,7 @@
   "component": {
     "group": "dk.cachet",
     "module": "rad",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "attributes": {
       "org.gradle.status": "release"
     }
@@ -11,7 +11,7 @@
   "createdBy": {
     "gradle": {
       "version": "6.1.1",
-      "buildId": "ookfr3ayejfinbxbafcdo7rw6m"
+      "buildId": "3wtvhi7spbdxdeo4cgizfofkwm"
     }
   },
   "variants": [
@@ -65,13 +65,13 @@
       ],
       "files": [
         {
-          "name": "rad-1.0.1.jar",
-          "url": "rad-1.0.1.jar",
-          "size": 12278,
-          "sha512": "38dcccd99d78b3f380c9655031b25a4edd5825c3ea62189213d1c7424b502210a6d2f36a4cf54ab6ce4dad83bff0c0c20d001c0f73a57e25f7638f714c1c3225",
-          "sha256": "b14134d1e30acb0838e6bd7d0d30c7c9b94bdaea9e375e6fd5ac266dbf7cc851",
-          "sha1": "b536468349c2baf0ad63c7acb6e08fb070cef6ca",
-          "md5": "2f702ff84c5b4d8dcc4b14d3b31d7dd5"
+          "name": "rad-1.0.2.jar",
+          "url": "rad-1.0.2.jar",
+          "size": 14062,
+          "sha512": "5770e9e41c309b9af96ec02621d7096b568874b8f007c0f09d6fb3ec10a0cab6648818036a285e93e045557509f54c7ba4b628d0cf85ce06cf82f2b4d4d9eef6",
+          "sha256": "e495d2ea3e51a005cb0901a42a1a3c89397c482adaf7fd4089288ed9d23341ec",
+          "sha1": "9126f451cda4d2bbf7b910d5919e3b6a9eb35666",
+          "md5": "6c8e7080a4788683f9d152df597afa41"
         }
       ]
     },
@@ -167,13 +167,13 @@
       ],
       "files": [
         {
-          "name": "rad-1.0.1.jar",
-          "url": "rad-1.0.1.jar",
-          "size": 12278,
-          "sha512": "38dcccd99d78b3f380c9655031b25a4edd5825c3ea62189213d1c7424b502210a6d2f36a4cf54ab6ce4dad83bff0c0c20d001c0f73a57e25f7638f714c1c3225",
-          "sha256": "b14134d1e30acb0838e6bd7d0d30c7c9b94bdaea9e375e6fd5ac266dbf7cc851",
-          "sha1": "b536468349c2baf0ad63c7acb6e08fb070cef6ca",
-          "md5": "2f702ff84c5b4d8dcc4b14d3b31d7dd5"
+          "name": "rad-1.0.2.jar",
+          "url": "rad-1.0.2.jar",
+          "size": 14062,
+          "sha512": "5770e9e41c309b9af96ec02621d7096b568874b8f007c0f09d6fb3ec10a0cab6648818036a285e93e045557509f54c7ba4b628d0cf85ce06cf82f2b4d4d9eef6",
+          "sha256": "e495d2ea3e51a005cb0901a42a1a3c89397c482adaf7fd4089288ed9d23341ec",
+          "sha1": "9126f451cda4d2bbf7b910d5919e3b6a9eb35666",
+          "md5": "6c8e7080a4788683f9d152df597afa41"
         }
       ]
     }

@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import kotlinx.serialization.ContextualSerialization
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
@@ -58,7 +59,6 @@ class RadProcessor : AbstractProcessor() {
 
 		// Populate authenticatedMethods with methods annotated with RequireAuthentication
 		roundEnv.getElementsAnnotatedWith(RequireAuthentication::class.java).forEach { element ->
-			processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, element.simpleName)
 			val methodElement = element as ExecutableElement
 			val enclosingClass = methodElement.enclosingElement as TypeElement
 			authenticatedMethods += Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())
@@ -100,13 +100,13 @@ class RadProcessor : AbstractProcessor() {
 		// and a response object if it has a return type
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			if(funSpec.parameters.isNotEmpty()) {
-				val requestObjectName = "${funSpec.name.capitalize()}Request"
 				// Define name and package of generated class
+				val requestObjectName = "${funSpec.name.capitalize()}Request"
 				val serviceClassName = ClassName(targetPackage, requestObjectName)
 
 				val typeBuilder = TypeSpec.classBuilder(serviceClassName)
 					.addModifiers(KModifier.DATA)
-					.addAnnotation(kotlinx.serialization.Serializable::class)
+					.addAnnotation(Serializable::class)
 
 				val constructorBuilder = FunSpec.constructorBuilder()
 
@@ -116,6 +116,9 @@ class RadProcessor : AbstractProcessor() {
 					typeBuilder.addProperty(
 						PropertySpec.builder(parameter.name, parameter.type)
 							.initializer(parameter.name)
+							// TODO
+							// 	If object type is not compile-time serializable,
+							//  annotate with @ContextualSerialization
 							.build()
 					)
 				}
@@ -129,13 +132,14 @@ class RadProcessor : AbstractProcessor() {
 				val responseObjectName = "${funSpec.name.capitalize()}Response"
 				val responseTypeBuilder = TypeSpec.classBuilder(ClassName(targetPackage, responseObjectName))
 					.addModifiers(KModifier.DATA)
-					.addAnnotation(kotlinx.serialization.Serializable::class)
+					.addAnnotation(Serializable::class)
 					.primaryConstructor(FunSpec.constructorBuilder()
 						.addParameter("result", funSpec.returnType!!)
 						.build())
 					.addProperty(PropertySpec.builder("result", funSpec.returnType!!)
 						.initializer("result")
 						.build())
+
 				fileSpec.addType(responseTypeBuilder.build())
 			}
 		}

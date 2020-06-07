@@ -9,7 +9,10 @@ subprojects {
     version = "1.0.1"
 
     repositories {
-        mavenLocal()
+        // Include the local repository containing rad-1.0.1
+        maven {
+            url = uri(rootProject.projectDir.path + "/localRepository")
+        }
         mavenCentral()
         jcenter()
     }

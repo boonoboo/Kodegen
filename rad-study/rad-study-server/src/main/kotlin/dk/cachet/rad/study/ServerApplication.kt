@@ -1,6 +1,6 @@
 package dk.cachet.rad.study
 
-import dk.cachet.rad.study.rad.SampleServiceImplModule
+import dk.cachet.rad.study.rad.DateServiceModule
 import io.ktor.application.Application
 import io.ktor.application.install
 import io.ktor.auth.Authentication
@@ -12,13 +12,14 @@ import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.jetty.Jetty
+import kotlinx.serialization.json.JsonConfiguration
 
 
 fun main() {
     val environment = applicationEngineEnvironment {
         module {
             mainModule()
-            SampleServiceImplModule(service = DateServiceImpl())
+            DateServiceModule(service = DateServiceImpl(), authSchemes = *arrayOf("basic"))
         }
         connector {
             host = "0.0.0.0"
@@ -33,7 +34,7 @@ fun main() {
 
 fun Application.mainModule() {
     install(ContentNegotiation) {
-        json()
+        json(JsonConfiguration.Stable, dateSerializerModule)
     }
 
     install(Authentication)

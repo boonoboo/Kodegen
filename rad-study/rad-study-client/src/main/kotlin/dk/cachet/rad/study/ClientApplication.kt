@@ -1,14 +1,17 @@
 package dk.cachet.rad.study
 
-import dk.cachet.rad.study.rad.DateServiceImplClient
+import dk.cachet.rad.study.rad.DateServiceClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.apache.Apache
 import io.ktor.client.features.auth.Auth
 import io.ktor.client.features.auth.providers.basic
+import io.ktor.client.features.json.JsonFeature
+import io.ktor.client.features.json.serializer.KotlinxSerializer
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
-import kotlinx.serialization.modules.SerializersModule
 
 fun main() {
     val app = ClientApp()
@@ -16,6 +19,8 @@ fun main() {
 }
 
 class ClientApp {
+    private val json = Json(JsonConfiguration.Stable, dateSerializerModule)
+
     private val client = HttpClient(Apache) {
         install(Auth) {
             basic {
@@ -23,15 +28,26 @@ class ClientApp {
                 password = "admin"
             }
         }
+
+        install(JsonFeature) {
+            serializer = KotlinxSerializer(json)
+        }
     }
 
-    private val service = DateServiceImplClient(client = client, baseUrl = "http://localhost:8080")
+    private val service = DateServiceClient(client = client, json = json, baseUrl = "http://localhost:8080")
 
     fun runApp() {
-        val date = runBlocking {
-            service.getDate()
+        val dateTime = GlobalScope.async {
+            service.getDateAsString("Good day!")
+        }
+        val date = GlobalScope.async {
+            service.getDateAsDate()
         }
 
-        println("The date today is: ${date}")
+        runBlocking {
+            println("The date today, as DateTime, is: ${dateTime.await()}")
+            println("The date today, as Date, is: ${date.await()}")
+        }
+
     }
 }

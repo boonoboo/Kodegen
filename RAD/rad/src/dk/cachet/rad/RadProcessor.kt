@@ -10,6 +10,7 @@ import io.ktor.application.Application
 import io.ktor.client.HttpClient
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
+import kotlinx.serialization.ContextualSerialization
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
@@ -19,6 +20,9 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
+/**
+ * Used for generation of Ktor artifacts based on elements tagged with [ApplicationService] and [RequireAuthentication].
+ */
 @KotlinPoetMetadataPreview
 @AutoService(Processor::class)
 class RadProcessor : AbstractProcessor() {
@@ -38,6 +42,7 @@ class RadProcessor : AbstractProcessor() {
 		return setOf(KAPT_KOTLIN_GENERATED_OPTION_NAME)
 	}
 
+	// Holds a service name / method name pair of methods that should be authenticated
 	private val authenticatedMethods = mutableListOf<Pair<String, String>>()
 
 	override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
@@ -51,7 +56,7 @@ class RadProcessor : AbstractProcessor() {
 			return false
 		}
 
-		//   Generate a list of methods annotated with RadAuthenticate
+		// Populate authenticatedMethods with methods annotated with RequireAuthentication
 		roundEnv.getElementsAnnotatedWith(RequireAuthentication::class.java).forEach { element ->
 			processingEnv.messager.printMessage(Diagnostic.Kind.NOTE, element.simpleName)
 			val methodElement = element as ExecutableElement
@@ -59,10 +64,11 @@ class RadProcessor : AbstractProcessor() {
 			authenticatedMethods += Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())
 		}
 
+		// Iterate through types annotated with ApplicationService, generating artifacts for each
 		roundEnv.getElementsAnnotatedWith(ApplicationService::class.java).forEach {
 			val serviceElement = it as TypeElement
 
-			// Get the package of the service which will be used for the generated components
+			// Get the package of the service, which will be used for the generated components
 			val servicePackage = processingEnv.elementUtils.getPackageOf(serviceElement).toString()
 
 			// Generate a KotlinPoet TypeSpec from the TypeElement, allowing Kotlin-specific information to be derived
@@ -87,7 +93,6 @@ class RadProcessor : AbstractProcessor() {
 
 		val file = File(generatedSourcesRoot)
 		file.mkdir()
-
 		val fileSpec = FileSpec.builder(targetPackage, fileName)
 
 		// Iterate through all function of the service
@@ -111,6 +116,7 @@ class RadProcessor : AbstractProcessor() {
 					typeBuilder.addProperty(
 						PropertySpec.builder(parameter.name, parameter.type)
 							.initializer(parameter.name)
+							.addAnnotation(ContextualSerialization::class)
 							.build()
 					)
 				}
@@ -130,6 +136,7 @@ class RadProcessor : AbstractProcessor() {
 						.build())
 					.addProperty(PropertySpec.builder("result", funSpec.returnType!!)
 						.initializer("result")
+						.addAnnotation(ContextualSerialization::class)
 						.build())
 				fileSpec.addType(responseTypeBuilder.build())
 			}
@@ -279,11 +286,6 @@ class RadProcessor : AbstractProcessor() {
 				.initializer("baseUrl")
 				.build())
 
-
-		// Extend the interface
-		// TODO: Disabled after changing @RadService to be used on interface rather than implementation
-		//  classBuilder.addSuperinterface(interfaceTypeName)
-
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			val apiUrl = "\$baseUrl/radApi/${serviceTypeSpec.name!!.decapitalize()}/${funSpec.name}"
@@ -292,8 +294,6 @@ class RadProcessor : AbstractProcessor() {
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
 				.addModifiers(KModifier.PUBLIC)
-				// TODO: Override disabled as class does not extend interface
-				//.addModifiers(KModifier.OVERRIDE)
 
 			if(funSpec.returnType != null)
 			{

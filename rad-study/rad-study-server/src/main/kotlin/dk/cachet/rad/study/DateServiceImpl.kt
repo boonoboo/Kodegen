@@ -1,11 +1,21 @@
 package dk.cachet.rad.study
 
+import dk.cachet.carp.common.DateTime
 import java.util.*
 
 class DateServiceImpl : DateService {
-    override suspend fun getDate(): Calendar {
-        return GregorianCalendar()
+    override suspend fun getDate(): DateTime {
+        return DateTime.now()
     }
+
+    override suspend fun getDateAsString(prefix: String): String {
+        return "$prefix ${DateTime.now()}"
+    }
+
+    override suspend fun getDateAsDate(): Date {
+        return Date()
+    }
+
 
     // Add parameter to getDate
     // add getDateAsString

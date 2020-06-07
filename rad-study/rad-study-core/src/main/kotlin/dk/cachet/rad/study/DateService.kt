@@ -1,13 +1,14 @@
 package dk.cachet.rad.study
 
-import dk.cachet.rad.RadService
+import dk.cachet.carp.common.DateTime
+import dk.cachet.rad.ApplicationService
 import java.util.*
 
-@RadService
+@ApplicationService
 interface DateService {
-    suspend fun getDate(): Calendar
+    suspend fun getDate(): DateTime
 
-    // suspend fun getDateAsString(): String
+    suspend fun getDateAsString(prefix: String): String
 
-    // suspend fun getOffsetDate(): Int
+    suspend fun getDateAsDate(): Date
 }

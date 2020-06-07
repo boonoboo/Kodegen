@@ -1,8 +1,6 @@
-# RADDD
+# rad
 
-<img src="./RAD/logo.png" width="150px" style="margin-left: auto; margin-right: auto; display: block;">
-
-RADDD is a library for generating Web APIs and API clients for Kotlin web services.
+rad is a library for automatic generation of web API endpoints and API client methods for Ktor applications.
 
 ## Usage
 
@@ -10,15 +8,15 @@ In your `build.gradle`, add rad to your dependencies:
 
 ```gradle
 dependencies {
-    implementation("dk.cachet.rad:rad:1.0.0")
+    implementation("dk.cachet:rad:1.0.1")
 }
 ```
 
-To generate endpoints, add the dependencies using the kapt configuration:
+To generate code, add the dependencies using the kapt configuration:
 
 ```gradle
 dependencies {
-    kapt("dk.cachet.rad:rad:1.0.0")
+    kapt("dk.cachet.rad:rad:1.0.1")
 }
 ````
 
@@ -26,37 +24,42 @@ dependencies {
 
 ### Basic use
 
-Given the following function:
+Given the following application service:
 
 ```kotlin
-@RadService
-class ExampleServiceImpl() : ExampleService {
-    override suspend fun foo(bar: Baz): Qux {
-        ...
-    }
+@ApplicationService
+class ExampleService() {
+    suspend fun foo(bar: Baz): Qux
 }
 ```
 
-RADDD will, on compilation, generate the following Ktor route:
+rad will, on compilation, generate the following Ktor module:
 
 ```kotlin
-post("/rad/foo/") {
-    val request = call.receive<FooRequest>()
-    val bar: Baz = request.bar
-    val result = foo(bar)
-    call.respond(result)
+fun Application.ExampleServiceModule(service: ExampleService, vararg authSchemes: String) {
+  routing {
+    post("/radApi/exampleService/foo/") {
+      val request = call.receive<FooRequest>()
+      val bar = request.bar
+      val result = service.foo(bar)
+      call.respond(result = result)
+    }
+  }
 }
 ```
 
-and the following client service invoker:
+and the following client class:
 
 ```kotlin
-class ExampleServiceImplInvoker(val client: HttpClient, val json: Json, val baseUrl: String) : ExampleService {
-    override suspend fun foo(bar: Baz): Qux {
-    val response = client.post<FooResponse>("api/foo") {
-        body = json.write(FooRequest(bar))
+class ExampleServiceInvoker(val client: HttpClient, val json: Json, val baseUrl: String) {
+    suspend fun foo(bar: Baz): Qux {
+    val jsonBody = json.stringify(FooRequest.serializer(), FooRequest(bar = bar))
+    val response = client.post<String> {
+        url("$baseUrl/radApi/dateService/foo")
+        body = TextContent(jsonBody, ContentType.Application.Json)
     }
-    return response.result
+    val result = json.parse(FooResponse.serializer(), response).result
+    return result
 }
 ```
 
@@ -74,23 +77,23 @@ data class FooResponse(val result: Qux)
 
 
 ### Authentication
-The ```RadAuthenticate``` annotation is used to authenticate specific endpoints using a Ktor authentication scheme.
+The ```RequiresAuthentication``` annotation is used to indicate that a user should be authenticated before a method is called. Using it will add an authentication interceptor before routing to the endpoint. The authentication schemes to use for this are passed as parameters to the Ktor module.
 
-Adding the ```RadAuthenticate``` annotation to ```foo```:
+Thus, adding ```RequiresAuthentication``` to the method ```foo```:
 
 ```kotlin
-@RadAuthenticate(["basic", "digest"])
+@RequiresAuthentication
 fun foo(bar: Baz): Qux
 {
     ...
 }
 ```
 
-adds a requirement for authentication using the scheme ```"basic"``` or ```"digest"```:
+results in the route:
 
 ```kotlin
-authenticate("basic", "digest") {
-    post("/rad/foo/") {
+authenticate(*authSchemes) {
+    post("/radApi/exampleService/foo/") {
         ...
     }
 }

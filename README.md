@@ -1,4 +1,4 @@
-# RADDD
+# rad
 
 <img src="./RAD/logo.png" width="150px" style="margin-left: auto; margin-right: auto; display: block;">
 

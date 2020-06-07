@@ -14,7 +14,6 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.jetty.Jetty
 import kotlinx.serialization.json.JsonConfiguration
 
-
 fun main() {
     val environment = applicationEngineEnvironment {
         module {

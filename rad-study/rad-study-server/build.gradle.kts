@@ -3,6 +3,7 @@ val ktor_version = "1.3.2"
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    application
 }
 
 dependencies {
@@ -15,4 +16,8 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.2.3")
 
     implementation(project(":rad-study-core"))
+}
+
+application {
+    mainClassName = "dk.cachet.rad.study.ServerApplicationKt"
 }

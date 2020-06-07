@@ -14,11 +14,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
 
 fun main() {
-    val app = ClientApp()
+    val app = ClientApplication()
     app.runApp()
 }
 
-class ClientApp {
+class ClientApplication {
     private val json = Json(JsonConfiguration.Stable, dateSerializerModule)
 
     private val client = HttpClient(Apache) {

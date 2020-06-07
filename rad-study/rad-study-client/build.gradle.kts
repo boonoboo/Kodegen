@@ -3,6 +3,7 @@ val ktor_version = "1.3.2"
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    application
 }
 
 dependencies {
@@ -17,4 +18,8 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
 
     implementation(project(":rad-study-core"))
+}
+
+application {
+    mainClassName = "dk.cachet.rad.study.ClientApplicationKt"
 }

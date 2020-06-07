@@ -1,7 +1,5 @@
 # rad
 
-<img src="./RAD/logo.png" width="150px" style="margin-left: auto; margin-right: auto; display: block;">
-
 rad is a library for automatic generation of web API endpoints and API client methods for Ktor applications.
 
 ## Usage

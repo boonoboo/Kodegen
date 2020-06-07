@@ -14,7 +14,7 @@ kapt {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
+    implementation(kotlin("stdlib-jdk8"))
 
     // Include Ktor
     // Transitive dependencies to allow projects using rad to access Ktor features
@@ -42,9 +42,8 @@ dependencies {
 
 sourceSets["main"].java.srcDir("src")
 
-repositories {
-    mavenCentral()
-    jcenter()
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 // For publishing to local maven repository

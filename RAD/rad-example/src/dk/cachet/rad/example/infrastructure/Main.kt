@@ -41,9 +41,9 @@ fun main() {
 	val environment = applicationEngineEnvironment {
 		module {
 			mainModule()
-			DiceServiceModule(DiceServiceImpl())
-			OracleServiceModule(OracleServiceImpl(AnswerRepository()))
-			ShapesServiceModule(ShapesServiceImpl())
+			DiceServiceModule(DiceServiceImpl(), "basic")
+			OracleServiceModule(OracleServiceImpl(AnswerRepository()), "basic")
+			ShapesServiceModule(ShapesServiceImpl(), "basic")
 		}
 	}
 	val server = embeddedServer(Jetty, environment) {

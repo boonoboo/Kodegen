@@ -39,7 +39,7 @@ class DiceServiceImpl : DiceService {
 
     override suspend fun rollVolatileDice(dice: Dice): Roll {
         if(Random.nextBoolean()){
-            throw IllegalStateException()
+            throw IllegalArgumentException()
         }
         else return rollCustomDice(dice)
     }

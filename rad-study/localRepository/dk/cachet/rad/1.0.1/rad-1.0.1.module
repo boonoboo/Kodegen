@@ -11,7 +11,7 @@
   "createdBy": {
     "gradle": {
       "version": "6.1.1",
-      "buildId": "6by4sauc7jdptgn4muslrff2we"
+      "buildId": "jlajb4w4pzawxly5dtfywkxlje"
     }
   },
   "variants": [
@@ -67,11 +67,11 @@
         {
           "name": "rad-1.0.1.jar",
           "url": "rad-1.0.1.jar",
-          "size": 12350,
-          "sha512": "d1ca7c845b3343ec574415e24ee9e8073119b3711ae49a994fcb0dd955ad731dd8777816f5b237bac8c784b1175d8f26333b0dc4aa66e2c4e329f7de20e09543",
-          "sha256": "a9edbf962d66059d372803afc9df86019d47cd9ab9375d945806f8e07d54cab9",
-          "sha1": "b6d369a138024f708a6864d1a2b5061c83c61bb5",
-          "md5": "74ddab15631ff2673156ff5d95322c6f"
+          "size": 12299,
+          "sha512": "18d5721d61ea923f6e3529217e16d00ec4cc207ebbc9d167761b2b8155aa95fe61f2f82493dcf8f180d026018287e88b68f5ad9f1340817d97c40c1501e5ebdb",
+          "sha256": "8a5eaef303318ea8799f724ecf847d255912a649a5f0470a8470176f1c6a9289",
+          "sha1": "f5f3d6b78a6d2e37c423b5b674e932980f637736",
+          "md5": "01e47604a2d5ca3596c09253cb7f619a"
         }
       ]
     },
@@ -89,7 +89,7 @@
       "dependencies": [
         {
           "group": "org.jetbrains.kotlin",
-          "module": "kotlin-stdlib",
+          "module": "kotlin-stdlib-jdk8",
           "version": {
             "requires": "1.3.72"
           }
@@ -169,11 +169,11 @@
         {
           "name": "rad-1.0.1.jar",
           "url": "rad-1.0.1.jar",
-          "size": 12350,
-          "sha512": "d1ca7c845b3343ec574415e24ee9e8073119b3711ae49a994fcb0dd955ad731dd8777816f5b237bac8c784b1175d8f26333b0dc4aa66e2c4e329f7de20e09543",
-          "sha256": "a9edbf962d66059d372803afc9df86019d47cd9ab9375d945806f8e07d54cab9",
-          "sha1": "b6d369a138024f708a6864d1a2b5061c83c61bb5",
-          "md5": "74ddab15631ff2673156ff5d95322c6f"
+          "size": 12299,
+          "sha512": "18d5721d61ea923f6e3529217e16d00ec4cc207ebbc9d167761b2b8155aa95fe61f2f82493dcf8f180d026018287e88b68f5ad9f1340817d97c40c1501e5ebdb",
+          "sha256": "8a5eaef303318ea8799f724ecf847d255912a649a5f0470a8470176f1c6a9289",
+          "sha1": "f5f3d6b78a6d2e37c423b5b674e932980f637736",
+          "md5": "01e47604a2d5ca3596c09253cb7f619a"
         }
       ]
     }

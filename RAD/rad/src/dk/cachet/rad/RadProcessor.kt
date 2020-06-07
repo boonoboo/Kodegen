@@ -116,7 +116,6 @@ class RadProcessor : AbstractProcessor() {
 					typeBuilder.addProperty(
 						PropertySpec.builder(parameter.name, parameter.type)
 							.initializer(parameter.name)
-							.addAnnotation(ContextualSerialization::class)
 							.build()
 					)
 				}
@@ -136,7 +135,6 @@ class RadProcessor : AbstractProcessor() {
 						.build())
 					.addProperty(PropertySpec.builder("result", funSpec.returnType!!)
 						.initializer("result")
-						.addAnnotation(ContextualSerialization::class)
 						.build())
 				fileSpec.addType(responseTypeBuilder.build())
 			}

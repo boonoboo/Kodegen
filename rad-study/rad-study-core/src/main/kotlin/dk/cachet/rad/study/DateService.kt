@@ -6,9 +6,5 @@ import java.util.*
 
 @ApplicationService
 interface DateService {
-    suspend fun getDate(): DateTime
-
-    suspend fun getDateAsString(prefix: String): String
-
-    suspend fun getDateAsDate(): Date
+    suspend fun getDate(): Date
 }

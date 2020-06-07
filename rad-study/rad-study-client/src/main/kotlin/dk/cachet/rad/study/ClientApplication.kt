@@ -37,17 +37,7 @@ class ClientApplication {
     private val service = DateServiceClient(client = client, json = json, baseUrl = "http://localhost:8080")
 
     fun runApp() {
-        val dateTime = GlobalScope.async {
-            service.getDateAsString("Good day!")
-        }
-        val date = GlobalScope.async {
-            service.getDateAsDate()
-        }
-
-        runBlocking {
-            println("The date today, as DateTime, is: ${dateTime.await()}")
-            println("The date today, as Date, is: ${date.await()}")
-        }
-
+        val date = runBlocking { service.getDate() }
+        println("The date today is $date")
     }
 }

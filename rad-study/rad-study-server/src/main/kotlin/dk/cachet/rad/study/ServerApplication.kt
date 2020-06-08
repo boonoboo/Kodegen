@@ -16,9 +16,11 @@ import kotlinx.serialization.json.JsonConfiguration
 
 fun main() {
     val environment = applicationEngineEnvironment {
+        val dateService = DateServiceImplementation()
+
         module {
             mainModule()
-            DateServiceModule(service = DateServiceImpl(), authSchemes = *arrayOf("basic"))
+            DateServiceModule(service = dateService, authSchemes = *arrayOf("basic"))
         }
         connector {
             host = "0.0.0.0"
@@ -31,7 +33,10 @@ fun main() {
     server.start(wait = true)
 }
 
+// Module for installing features into the web application
 fun Application.mainModule() {
+
+    // Install automatic JSON serialization using a Json handler with a custom serial module
     install(ContentNegotiation) {
         json(JsonConfiguration.Stable, dateSerializerModule)
     }

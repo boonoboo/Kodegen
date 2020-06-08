@@ -13,8 +13,8 @@ object DateSerializer: KSerializer<Date> {
     override val descriptor: SerialDescriptor =
             PrimitiveDescriptor("WithCustomDefault", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, obj: Date) {
-        encoder.encodeString(df.format(obj))
+    override fun serialize(encoder: Encoder, value: Date) {
+        encoder.encodeString(df.format(value))
     }
 
     override fun deserialize(decoder: Decoder): Date {

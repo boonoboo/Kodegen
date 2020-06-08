@@ -19,8 +19,10 @@ fun main() {
 }
 
 class ClientApplication {
+    // Initialize a Json handler with a custom serial module
     private val json = Json(JsonConfiguration.Stable, dateSerializerModule)
 
+    // Initialize a custom Ktor HttpClient
     private val client = HttpClient(Apache) {
         install(Auth) {
             basic {
@@ -34,10 +36,11 @@ class ClientApplication {
         }
     }
 
-    private val service = DateServiceClient(client = client, json = json, baseUrl = "http://localhost:8080")
+    // Initialize a DateService service invoker
+    private val service = DateServiceClient(client, json, "http://localhost:8080")
 
     fun runApp() {
-        val date = runBlocking { service.getDate() }
+        val date = runBlocking { service.getCurrentDate() }
         println("The date today is $date")
     }
 }

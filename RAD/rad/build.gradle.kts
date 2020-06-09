@@ -27,8 +27,12 @@ dependencies {
     // Transitive dependency to allow projects using rad to use serialization
     api("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
 
-    // Include AutoService
+    // Include AutoService and gradle-incap-helper to automatically generate META-INF files
     implementation("com.google.auto.service:auto-service:1.0-rc6")
+    implementation("net.ltgt.gradle.incap:incap:0.2")
+    compileOnly("net.ltgt.gradle.incap:incap-processor:0.2")
+    kapt("net.ltgt.gradle.incap:incap-processor:0.2")
+
 
     // Include Kotlin Poet
     implementation("com.squareup:kotlinpoet:1.5.0")
@@ -57,7 +61,7 @@ publishing {
         create<MavenPublication>("rad") {
             groupId = "dk.cachet"
             artifactId = "rad"
-            version = "1.0.2"
+            version = "1.0.3"
 
             from(components["java"])
         }

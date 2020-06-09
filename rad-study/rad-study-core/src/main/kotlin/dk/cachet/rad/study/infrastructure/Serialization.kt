@@ -1,4 +1,4 @@
-package dk.cachet.rad.study
+package dk.cachet.rad.study.infrastructure
 
 import kotlinx.serialization.*
 import kotlinx.serialization.modules.serializersModuleOf

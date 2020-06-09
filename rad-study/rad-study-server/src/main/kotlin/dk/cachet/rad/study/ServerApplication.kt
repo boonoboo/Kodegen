@@ -1,6 +1,7 @@
 package dk.cachet.rad.study
 
-import dk.cachet.rad.study.rad.DateServiceModule
+import dk.cachet.rad.study.application.rad.AtmServiceModule
+import dk.cachet.rad.study.infrastructure.dateSerializerModule
 import io.ktor.application.Application
 import io.ktor.application.install
 import io.ktor.auth.Authentication
@@ -16,12 +17,14 @@ import kotlinx.serialization.json.JsonConfiguration
 
 fun main() {
     val environment = applicationEngineEnvironment {
-        val dateService = DateServiceImplementation()
+        val accountRepository = InMemoryAccountRepository()
+        val atmService = AtmServiceImplementation(accountRepository)
 
         module {
             mainModule()
-            DateServiceModule(service = dateService, authSchemes = *arrayOf("basic"))
+            AtmServiceModule(service = atmService, authSchemes = *arrayOf("basic"))
         }
+
         connector {
             host = "0.0.0.0"
             port = 8080

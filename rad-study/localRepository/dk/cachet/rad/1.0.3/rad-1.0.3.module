@@ -3,7 +3,7 @@
   "component": {
     "group": "dk.cachet",
     "module": "rad",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "attributes": {
       "org.gradle.status": "release"
     }
@@ -11,7 +11,7 @@
   "createdBy": {
     "gradle": {
       "version": "6.1.1",
-      "buildId": "3xsoyhqo5fhzrmhxkwqpumxt5e"
+      "buildId": "javoybiro5bcror2rh3cd4aq5e"
     }
   },
   "variants": [
@@ -65,13 +65,13 @@
       ],
       "files": [
         {
-          "name": "rad-1.0.2.jar",
-          "url": "rad-1.0.2.jar",
-          "size": 14423,
-          "sha512": "b204fb5eb1d164cf2404d01017836355b90855ab0c74fc94dbc463342312b810d45d6ff5bcb3ed2e8c4d086c2dc5eabb242defd71d2aa9752c14a7f2c41a853b",
-          "sha256": "c7984345846eb7b86d88cbe5456809e93342d6832aa3c3966e6033e118295419",
-          "sha1": "30e2913478d67e6ee2d7c182d75e96fdcc005f8b",
-          "md5": "991ffc3f8f693b3f877b09bc7a6daa53"
+          "name": "rad-1.0.3.jar",
+          "url": "rad-1.0.3.jar",
+          "size": 14646,
+          "sha512": "6ea578234621e733286311ee5927f96715fd211f968034f6f3af80ecb80332736a33c143be08d66dc4713867e7f6335090279cc4a39c12f95871fb2c4c031670",
+          "sha256": "4ed2fa3ae91bd0c6b701a9b868f1bd674230ba45b6fae499b1327e79c93d54a5",
+          "sha1": "bf4a5938b33e3cfc5a684ca7adf3cbc17bb313cc",
+          "md5": "83b5fecb643d3120397a4688fd1ad278"
         }
       ]
     },
@@ -99,6 +99,13 @@
           "module": "auto-service",
           "version": {
             "requires": "1.0-rc6"
+          }
+        },
+        {
+          "group": "net.ltgt.gradle.incap",
+          "module": "incap",
+          "version": {
+            "requires": "0.2"
           }
         },
         {
@@ -167,13 +174,13 @@
       ],
       "files": [
         {
-          "name": "rad-1.0.2.jar",
-          "url": "rad-1.0.2.jar",
-          "size": 14423,
-          "sha512": "b204fb5eb1d164cf2404d01017836355b90855ab0c74fc94dbc463342312b810d45d6ff5bcb3ed2e8c4d086c2dc5eabb242defd71d2aa9752c14a7f2c41a853b",
-          "sha256": "c7984345846eb7b86d88cbe5456809e93342d6832aa3c3966e6033e118295419",
-          "sha1": "30e2913478d67e6ee2d7c182d75e96fdcc005f8b",
-          "md5": "991ffc3f8f693b3f877b09bc7a6daa53"
+          "name": "rad-1.0.3.jar",
+          "url": "rad-1.0.3.jar",
+          "size": 14646,
+          "sha512": "6ea578234621e733286311ee5927f96715fd211f968034f6f3af80ecb80332736a33c143be08d66dc4713867e7f6335090279cc4a39c12f95871fb2c4c031670",
+          "sha256": "4ed2fa3ae91bd0c6b701a9b868f1bd674230ba45b6fae499b1327e79c93d54a5",
+          "sha1": "bf4a5938b33e3cfc5a684ca7adf3cbc17bb313cc",
+          "md5": "83b5fecb643d3120397a4688fd1ad278"
         }
       ]
     }

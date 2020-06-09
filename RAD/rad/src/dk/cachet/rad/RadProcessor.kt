@@ -1,6 +1,9 @@
 package dk.cachet.rad
 
 import com.google.auto.service.AutoService
+import net.ltgt.gradle.incap.IncrementalAnnotationProcessor
+import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType
+
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
@@ -20,7 +23,6 @@ import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
-import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
@@ -30,6 +32,7 @@ import javax.tools.Diagnostic
  */
 @KotlinPoetMetadataPreview
 @AutoService(Processor::class)
+@IncrementalAnnotationProcessor(IncrementalAnnotationProcessorType.AGGREGATING)
 class RadProcessor : AbstractProcessor() {
 	companion object {
 		const val KAPT_KOTLIN_GENERATED_OPTION_NAME = "kapt.kotlin.generated"
@@ -73,8 +76,6 @@ class RadProcessor : AbstractProcessor() {
 			authenticatedMethods += Pair(enclosingClass.simpleName.toString(), methodElement.simpleName.toString())
 		}
 
-		val serializableElements = roundEnv.getElementsAnnotatedWith(Serializable::class.java)
-
 		// Iterate through types annotated with ApplicationService, generating artifacts for each
 		roundEnv.getElementsAnnotatedWith(ApplicationService::class.java).forEach {
 			val serviceElement = it as TypeElement
@@ -91,7 +92,7 @@ class RadProcessor : AbstractProcessor() {
 			val serviceTypeSpec = serviceElement.toTypeSpec(classInspector)
 
 			// Generate the components
-			generateTransferObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot, serializableElements)
+			generateTransferObjects(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateServerEndpoint(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 			generateServiceInvoker(serviceTypeSpec, servicePackage, generatedSourcesRoot)
 		}
@@ -100,8 +101,7 @@ class RadProcessor : AbstractProcessor() {
 
 	private fun generateTransferObjects(serviceTypeSpec: TypeSpec,
 										servicePackage: String,
-										generatedSourcesRoot: String,
-										serializableElements: Set<Element>) {
+										generatedSourcesRoot: String) {
 
 		val targetPackage = "$servicePackage.rad"
 		val fileName = "${serviceTypeSpec.name!!.capitalize()}Objects"
@@ -129,7 +129,11 @@ class RadProcessor : AbstractProcessor() {
 				funSpec.parameters.forEach { parameter ->
 					// Find the parameter type and check if a serializer can be found at compile-time
 					// If not, add ContextualSerialization
-					val parameterType = getTypeWithContextualSerialization(parameter.type, serializableElements)
+					var parameterType = getTypeWithContextualSerialization(parameter.type)
+					if(parameter.type.isNullable)
+					{
+						parameterType = parameterType.copy(nullable = true)
+					}
 					val propertySpec = PropertySpec.builder(parameter.name, parameterType)
 						.initializer(parameter.name)
 						.build()
@@ -149,7 +153,14 @@ class RadProcessor : AbstractProcessor() {
 
 				// Find the parameter type and check if a serializer can be found at compile-time
 				// If not, add ContextualSerialization
-				val resultType = getTypeWithContextualSerialization(funSpec.returnType!!, serializableElements)
+
+				var resultType = getTypeWithContextualSerialization(funSpec.returnType!!)
+				if(funSpec.returnType!!.isNullable)
+				{
+					resultType = resultType.copy(nullable = true)
+				}
+
+
 				val result = PropertySpec.builder("result", resultType)
 					.initializer("result")
 					.build()
@@ -173,21 +184,27 @@ class RadProcessor : AbstractProcessor() {
 			.writeTo(file)
 	}
 
-	private fun getTypeWithContextualSerialization(type: TypeName, serializableElements: Set<Element>): TypeName {
+	private fun getTypeWithContextualSerialization(type: TypeName): TypeName {
 		val contextualSerializationSpec = AnnotationSpec.builder(ContextualSerialization::class.asTypeName()).build()
+		val typeElement = processingEnv.elementUtils.getTypeElement(type.toString())
+
 		var newType = type
 
 		if(type is ParameterizedTypeName)
 		{
-			val typeArguments = type.typeArguments.map { getTypeWithContextualSerialization(it, serializableElements) }
+			val typeArguments = type.typeArguments.map { getTypeWithContextualSerialization(it) }
 			newType = ClassName(type.rawType.packageName, type.rawType.simpleName).parameterizedBy(typeArguments)
-			if(!serializableElements.contains(processingEnv.elementUtils.getTypeElement(type.toString())) &&
-				!KOTLIN_BUILTIN_SERIALIZERS.contains(type.rawType.canonicalName)) {
+
+			// Check if the type is serializable, has a built-in serializer or is nullable and has a built-in serializer
+			if(!(typeElement?.getAnnotation(Serializable::class.java) != null ||
+				KOTLIN_BUILTIN_SERIALIZERS.contains(type.rawType.canonicalName) ||
+				(type.isNullable && KOTLIN_BUILTIN_SERIALIZERS.contains(type.rawType.toString().substring(0,type.toString().length-1))))) {
 				newType = type.copy(false, type.annotations.plus(contextualSerializationSpec))
 			}
 		}
-		else if (!serializableElements.contains(processingEnv.elementUtils.getTypeElement(type.toString())) &&
-			!KOTLIN_BUILTIN_SERIALIZERS.contains(type.toString())) {
+		else if (!(typeElement?.getAnnotation(Serializable::class.java) != null ||
+				KOTLIN_BUILTIN_SERIALIZERS.contains(type.toString()) ||
+					(type.isNullable && KOTLIN_BUILTIN_SERIALIZERS.contains(type.toString().substring(0,type.toString().length-1))))) {
 			newType = type.copy(false, type.annotations.plus(contextualSerializationSpec))
 		}
 		return newType

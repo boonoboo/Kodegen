@@ -11,7 +11,7 @@
   "createdBy": {
     "gradle": {
       "version": "6.1.1",
-      "buildId": "javoybiro5bcror2rh3cd4aq5e"
+      "buildId": "g6c7r5tszjesre2nu7bska7cvq"
     }
   },
   "variants": [
@@ -67,11 +67,11 @@
         {
           "name": "rad-1.0.3.jar",
           "url": "rad-1.0.3.jar",
-          "size": 14646,
-          "sha512": "6ea578234621e733286311ee5927f96715fd211f968034f6f3af80ecb80332736a33c143be08d66dc4713867e7f6335090279cc4a39c12f95871fb2c4c031670",
-          "sha256": "4ed2fa3ae91bd0c6b701a9b868f1bd674230ba45b6fae499b1327e79c93d54a5",
-          "sha1": "bf4a5938b33e3cfc5a684ca7adf3cbc17bb313cc",
-          "md5": "83b5fecb643d3120397a4688fd1ad278"
+          "size": 14686,
+          "sha512": "25fa21f330e817f1c5e8a947f7338f00e40ee12ee10411bad60e84cecd2b9589bd6a7e1cbac67373473c042ca6cb578ceb0360c1da58cb0aafa5d6b56d65157b",
+          "sha256": "b9581e46d899211de66d192601932f50c20702de850481739fab6a0f6d564010",
+          "sha1": "55977f013a8a68caf4a3f7e4b7f1e2078ab0cc0a",
+          "md5": "6caa2b028f0913517bb37dac5f011695"
         }
       ]
     },
@@ -176,11 +176,11 @@
         {
           "name": "rad-1.0.3.jar",
           "url": "rad-1.0.3.jar",
-          "size": 14646,
-          "sha512": "6ea578234621e733286311ee5927f96715fd211f968034f6f3af80ecb80332736a33c143be08d66dc4713867e7f6335090279cc4a39c12f95871fb2c4c031670",
-          "sha256": "4ed2fa3ae91bd0c6b701a9b868f1bd674230ba45b6fae499b1327e79c93d54a5",
-          "sha1": "bf4a5938b33e3cfc5a684ca7adf3cbc17bb313cc",
-          "md5": "83b5fecb643d3120397a4688fd1ad278"
+          "size": 14686,
+          "sha512": "25fa21f330e817f1c5e8a947f7338f00e40ee12ee10411bad60e84cecd2b9589bd6a7e1cbac67373473c042ca6cb578ceb0360c1da58cb0aafa5d6b56d65157b",
+          "sha256": "b9581e46d899211de66d192601932f50c20702de850481739fab6a0f6d564010",
+          "sha1": "55977f013a8a68caf4a3f7e4b7f1e2078ab0cc0a",
+          "md5": "6caa2b028f0913517bb37dac5f011695"
         }
       ]
     }

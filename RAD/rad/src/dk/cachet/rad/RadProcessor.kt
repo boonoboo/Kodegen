@@ -116,7 +116,7 @@ class RadProcessor : AbstractProcessor() {
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			if(funSpec.parameters.isNotEmpty()) {
 				// Define name and package of generated class
-				val requestObjectName = "${funSpec.name.capitalize()}Request"
+				val requestObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Request"
 				val serviceClassName = ClassName(targetPackage, requestObjectName)
 
 				val typeBuilder = TypeSpec.classBuilder(serviceClassName)
@@ -149,7 +149,7 @@ class RadProcessor : AbstractProcessor() {
 				fileSpec.addType(typeBuilder.build())
 			}
 			if (funSpec.returnType != null) {
-				val responseObjectName = "${funSpec.name.capitalize()}Response"
+				val responseObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Response"
 
 				// Find the parameter type and check if a serializer can be found at compile-time
 				// If not, add ContextualSerialization
@@ -230,7 +230,7 @@ class RadProcessor : AbstractProcessor() {
 
 		// Iterate through functions in service, generating a route for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
-			val requestObjectName = "${funSpec.name.capitalize()}Request"
+			val requestObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Request"
 			// Create endpoint corresponding to the funSpec
 			// 1st step: Route on HTTP Method (POST)
 			val post = MemberName("io.ktor.routing", "post")
@@ -276,7 +276,7 @@ class RadProcessor : AbstractProcessor() {
 			resultStatement = "val result = $resultStatement"
 
 			// 5th step: Wrap the result in a response object and return the result
-			val responseObjectName = "${funSpec.name.capitalize()}Response"
+			val responseObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Response"
 			val respond = MemberName("io.ktor.response", "respond")
 			val responseStatement = "%M.%M($responseObjectName(result = result))"
 
@@ -352,7 +352,7 @@ class RadProcessor : AbstractProcessor() {
 		// Iterate through functions, adding a client function for each
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			val apiUrl = "\$baseUrl/radApi/${serviceTypeSpec.name!!.decapitalize()}/${funSpec.name}"
-			val requestObjectName = "${funSpec.name.capitalize()}Request"
+			val requestObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Request"
 
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
@@ -431,7 +431,7 @@ class RadProcessor : AbstractProcessor() {
 
 			// 4th: step: Parse the result and return it
 			if(funSpec.returnType != null) {
-				val responseType = "${funSpec.name.capitalize()}Response"
+				val responseType = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Response"
 
 				clientFunctionBuilder
 					.addStatement("val result = json.parse($responseType.serializer(), response).result")

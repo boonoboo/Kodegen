@@ -5,15 +5,16 @@ import dk.cachet.rad.example.application.oracle.rad.OracleServiceClient
 import dk.cachet.rad.example.application.shapes.rad.ShapesServiceClient
 import dk.cachet.rad.example.domain.dice.Dice
 import dk.cachet.rad.example.infrastructure.shapes.json
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 
 fun main() {
 	val frontEndService = FrontEndService(
-		DiceServiceClient(baseUrl = "http://localhost:8080"),
-		OracleServiceClient(baseUrl = "http://localhost:8080"),
-		ShapesServiceClient(json = json, baseUrl = "http://localhost:8080")
+		DiceServiceClient(HttpClient(), baseUrl = "http://localhost:8080"),
+		OracleServiceClient(HttpClient(), baseUrl = "http://localhost:8080"),
+		ShapesServiceClient(HttpClient(), baseUrl = "http://localhost:8080")
 	)
 	frontEndService.doFrontendThing()
 }

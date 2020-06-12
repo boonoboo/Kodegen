@@ -331,19 +331,12 @@ class RadProcessor : AbstractProcessor() {
 		val classBuilder = TypeSpec.classBuilder(className)
 			.primaryConstructor(FunSpec.constructorBuilder()
 				.addParameter(ParameterSpec.builder("client", HttpClient::class)
-					.defaultValue("%T()", HttpClient::class)
-					.build())
-				.addParameter(ParameterSpec.builder("json", Json::class)
-					.defaultValue("Json(%T.Stable)", JsonConfiguration::class)
 					.build())
 				.addParameter(ParameterSpec.builder("baseUrl", String::class)
 					.build())
 				.build())
 			.addProperty(PropertySpec.builder("client", HttpClient::class)
 				.initializer("client")
-				.build())
-			.addProperty(PropertySpec.builder("json", Json::class)
-				.initializer("json")
 				.build())
 			.addProperty(PropertySpec.builder("baseUrl", String::class)
 				.initializer("baseUrl")
@@ -353,6 +346,7 @@ class RadProcessor : AbstractProcessor() {
 		serviceTypeSpec.funSpecs.forEach { funSpec ->
 			val apiUrl = "\$baseUrl/radApi/${serviceTypeSpec.name!!.decapitalize()}/${funSpec.name}"
 			val requestObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Request"
+			val responseObjectName = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Response"
 
 			// Create client function
 			val clientFunctionBuilder = FunSpec.builder(funSpec.name)
@@ -375,25 +369,28 @@ class RadProcessor : AbstractProcessor() {
 				clientFunctionBuilder.addParameter(parameter)
 			}
 
-			// 2nd step: Convert the body, if any, to JSON
+			// 2nd step: Create the body
 			if(funSpec.parameters.isNotEmpty()) {
-				var jsonBodyStatement = "json.stringify($requestObjectName.serializer(), $requestObjectName("
+				var bodyStatement = "$requestObjectName("
 
 				funSpec.parameters.forEachIndexed { index, parameter ->
-					jsonBodyStatement = "$jsonBodyStatement${parameter.name} = ${parameter.name}"
+					bodyStatement = "$bodyStatement${parameter.name} = ${parameter.name}"
 					if(index != funSpec.parameters.lastIndex) {
-						jsonBodyStatement = "$jsonBodyStatement, "
+						bodyStatement = "$bodyStatement, "
 					}
 				}
-				jsonBodyStatement = "$jsonBodyStatement))"
+				bodyStatement = "$bodyStatement)"
 
 				clientFunctionBuilder
-					.addStatement("val jsonBody = $jsonBodyStatement")
+					.addStatement("val messageBody = $bodyStatement")
 			}
 
 			// 3rd step: Make request
 			val post = MemberName("io.ktor.client.request", "post")
 			val url = MemberName("io.ktor.client.request", "url")
+			val contentType = MemberName("io.ktor.http", "contentType")
+			val contentTypeEnum = MemberName("io.ktor.http", "ContentType")
+
 
 			// If the function is not suspendable, wrap the network call in runBlocking
 			// and set response to the result of this
@@ -404,7 +401,8 @@ class RadProcessor : AbstractProcessor() {
 			}
 
 			// If the function is suspendable, set response to the result of the post call
-			var responseStatement = "client.%M<String>"
+			var responseStatement = if (funSpec.returnType == null) "client.%M<Unit>" else "client.%M<$responseObjectName>"
+
 			if (funSpec.modifiers.contains((KModifier.SUSPEND))) {
 				responseStatement = "val response = $responseStatement"
 			}
@@ -413,10 +411,11 @@ class RadProcessor : AbstractProcessor() {
 			clientFunctionBuilder
 				.beginControlFlow(responseStatement, post)
 				.addStatement("%M(%P)", url, apiUrl)
+				.addStatement("%M(%M.Application.Json)", contentType, contentTypeEnum)
 
 			// If the function call has any parameters, serialize a request object and add it
 			if (funSpec.parameters.isNotEmpty()) {
-				clientFunctionBuilder.addStatement("body = %T(jsonBody, %T.Application.Json)", TextContent::class, ContentType::class)
+				clientFunctionBuilder.addStatement("body = messageBody")
 			}
 
 			// End the post block
@@ -431,11 +430,8 @@ class RadProcessor : AbstractProcessor() {
 
 			// 4th: step: Parse the result and return it
 			if(funSpec.returnType != null) {
-				val responseType = "${serviceTypeSpec.name!!.capitalize()}${funSpec.name.capitalize()}Response"
-
 				clientFunctionBuilder
-					.addStatement("val result = json.parse($responseType.serializer(), response).result")
-					.addStatement("return result")
+					.addStatement("return response.result")
 			}
 			else {
 				clientFunctionBuilder.addStatement("return")

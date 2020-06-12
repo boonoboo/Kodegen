@@ -37,7 +37,7 @@ class ClientApplication {
     }
 
     // Initialize a DateService service invoker
-    private val service = AtmServiceClient(client, json, "http://localhost:8080")
+    private val service = AtmServiceClient(client, "http://localhost:8080")
 
     fun runApp() {
         val card = Card("4571 1928 3746 5555")

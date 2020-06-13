@@ -1,14 +1,14 @@
-# rad
+# Kodegen
 
-rad is a library for automatic generation of web API endpoints and API client methods for Ktor applications.
+Kodegen is a library for automatic generation of web API endpoints and API client methods for Ktor applications.
 
 ## Usage
 
-In your `build.gradle`, add rad to your dependencies:
+In your `build.gradle`, add Kodegen to your dependencies:
 
 ```gradle
 dependencies {
-    implementation("dk.cachet:rad:1.0.1")
+    implementation("dk.cachet:kodegen:1.0.0")
 }
 ```
 
@@ -16,7 +16,7 @@ To generate code, add the dependencies using the kapt configuration:
 
 ```gradle
 dependencies {
-    kapt("dk.cachet.rad:rad:1.0.1")
+    kapt("dk.cachet:kodegen:1.0.0")
 }
 ````
 
@@ -33,12 +33,12 @@ class ExampleService() {
 }
 ```
 
-rad will, on compilation, generate the following Ktor module:
+Kodegen will, on compilation, generate the following Ktor module:
 
 ```kotlin
 fun Application.ExampleServiceModule(service: ExampleService, vararg authSchemes: String) {
   routing {
-    post("/radApi/exampleService/foo/") {
+    post("/kodegenApi/exampleService/foo/") {
       val request = call.receive<FooRequest>()
       val bar = request.bar
       val result = service.foo(bar)
@@ -67,12 +67,12 @@ using the following request and response objects:
 
 ```kotlin
 @Serializable
-data class FooRequest(val bar: Baz)
+data class ExampleServiceFooRequest(val bar: Baz)
 ```
 
 ```kotlin
 @Serializable
-data class FooResponse(val result: Qux)
+data class ExampleServiceFooResponse(val result: Qux)
 ```
 
 

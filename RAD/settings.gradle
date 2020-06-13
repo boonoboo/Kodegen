@@ -1,2 +1,0 @@
-rootProject.name = "RAD"
-include ":rad", ":rad-example", ":rad-example-client"

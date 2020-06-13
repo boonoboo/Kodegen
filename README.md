@@ -55,7 +55,7 @@ class ExampleServiceInvoker(val client: HttpClient, val json: Json, val baseUrl:
     suspend fun foo(bar: Baz): Qux {
     val jsonBody = json.stringify(FooRequest.serializer(), FooRequest(bar = bar))
     val response = client.post<String> {
-        url("$baseUrl/radApi/dateService/foo")
+        url("$baseUrl/kodegenApi/dateService/foo")
         body = TextContent(jsonBody, ContentType.Application.Json)
     }
     val result = json.parse(FooResponse.serializer(), response).result

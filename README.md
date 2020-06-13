@@ -93,7 +93,7 @@ results in the route:
 
 ```kotlin
 authenticate(*authSchemes) {
-    post("/radApi/exampleService/foo/") {
+    post("/kodegenApi/exampleService/foo/") {
         ...
     }
 }

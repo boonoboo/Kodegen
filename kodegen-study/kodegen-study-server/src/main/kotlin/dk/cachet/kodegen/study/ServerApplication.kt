@@ -8,6 +8,7 @@ import io.ktor.auth.Authentication
 import io.ktor.auth.UserIdPrincipal
 import io.ktor.auth.basic
 import io.ktor.features.ContentNegotiation
+import io.ktor.http.ContentType
 import io.ktor.serialization.json
 import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.connector
@@ -47,9 +48,9 @@ fun Application.mainModule() {
     install(Authentication)
     {
         basic(name = "basic") {
-            realm = "Rad Study Server"
+            realm = "Kodegen"
             validate { credentials ->
-                if (credentials.name == "admin" && credentials.password == "admin")
+                if (credentials.name == "admin" && credentials.password == "adminPassword")
                     UserIdPrincipal(credentials.name)
                 else {
                     null

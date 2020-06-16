@@ -1,7 +1,5 @@
 package dk.cachet.kodegen.example.application.shapes
 
-import dk.cachet.kodegen.ApplicationService
-import dk.cachet.kodegen.example.application.shapes.ShapesService
 import dk.cachet.kodegen.example.domain.shapes.Circle
 import dk.cachet.kodegen.example.domain.shapes.Rectangle
 import dk.cachet.kodegen.example.domain.shapes.Shape

@@ -27,7 +27,7 @@ class ClientApplication {
         install(Auth) {
             basic {
                 username = "admin"
-                password = "admin"
+                password = "adminPassword"
             }
         }
 

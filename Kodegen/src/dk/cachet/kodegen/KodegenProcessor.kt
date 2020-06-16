@@ -44,7 +44,7 @@ class KodegenProcessor : AbstractProcessor() {
 	}
 
 	override fun getSupportedAnnotationTypes(): Set<String> {
-		return setOf("dk.cachet.kodegen.ApplicationService", "dk.cachet.kodegen.RequireAuthentication")
+		return setOf("ApplicationService", "RequireAuthentication")
 	}
 
 	override fun getSupportedSourceVersion(): SourceVersion {

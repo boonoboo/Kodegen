@@ -11,7 +11,7 @@
   "createdBy": {
     "gradle": {
       "version": "6.1.1",
-      "buildId": "slg6xsx24vfmrarvgvgvi6mh74"
+      "buildId": "keibqdyvd5apfkyr6fypkwo2wq"
     }
   },
   "variants": [
@@ -67,11 +67,11 @@
         {
           "name": "kodegen-1.0.0.jar",
           "url": "kodegen-1.0.0.jar",
-          "size": 14493,
-          "sha512": "9402d84e36ce96cca5f6c17535133241b9e965d609c1b2cc8a9d660bcd18d10a62311f13b209960ce22615125decaba8a5892380b629497e80a9c5be22ed877c",
-          "sha256": "119905ca3ca0208abf146ef3c22bb3a5cb046f666a62beb660e74ef96764e32a",
-          "sha1": "abace529e0ea3758dd976c38bf957d9b5e1048e7",
-          "md5": "a93050123d45ab817507e12929d87ca8"
+          "size": 14781,
+          "sha512": "fda7f36aebd8e60765ea26f2f8567bcfc3a58c627212cdabd0f516a962853eb5a4f4ebb453ab94138776beed055d0c984f7c4ac540f1265f381d13654515d7f3",
+          "sha256": "a0fb16555f21122805cdc355568f5c36be6d4224d8e6a32c4ecf89d69f8e1dea",
+          "sha1": "3714eceef2de2dcc8fbc37193d4f193ec4072483",
+          "md5": "2d263940e24cea18f84871e013d1a59d"
         }
       ]
     },
@@ -176,11 +176,11 @@
         {
           "name": "kodegen-1.0.0.jar",
           "url": "kodegen-1.0.0.jar",
-          "size": 14493,
-          "sha512": "9402d84e36ce96cca5f6c17535133241b9e965d609c1b2cc8a9d660bcd18d10a62311f13b209960ce22615125decaba8a5892380b629497e80a9c5be22ed877c",
-          "sha256": "119905ca3ca0208abf146ef3c22bb3a5cb046f666a62beb660e74ef96764e32a",
-          "sha1": "abace529e0ea3758dd976c38bf957d9b5e1048e7",
-          "md5": "a93050123d45ab817507e12929d87ca8"
+          "size": 14781,
+          "sha512": "fda7f36aebd8e60765ea26f2f8567bcfc3a58c627212cdabd0f516a962853eb5a4f4ebb453ab94138776beed055d0c984f7c4ac540f1265f381d13654515d7f3",
+          "sha256": "a0fb16555f21122805cdc355568f5c36be6d4224d8e6a32c4ecf89d69f8e1dea",
+          "sha1": "3714eceef2de2dcc8fbc37193d4f193ec4072483",
+          "md5": "2d263940e24cea18f84871e013d1a59d"
         }
       ]
     }

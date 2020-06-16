@@ -1,6 +1,7 @@
 package dk.cachet.kodegen.study
 
-import dk.cachet.kodegen.study.application.kodegen.AtmServiceModule
+import dk.cachet.kodegen.study.application.kodegen.AccountServiceModule
+import dk.cachet.kodegen.study.application.kodegen.CustomerServiceModule
 import dk.cachet.kodegen.study.infrastructure.dateSerializerModule
 import io.ktor.application.Application
 import io.ktor.application.install
@@ -8,7 +9,6 @@ import io.ktor.auth.Authentication
 import io.ktor.auth.UserIdPrincipal
 import io.ktor.auth.basic
 import io.ktor.features.ContentNegotiation
-import io.ktor.http.ContentType
 import io.ktor.serialization.json
 import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.connector
@@ -18,12 +18,13 @@ import kotlinx.serialization.json.JsonConfiguration
 
 fun main() {
     val environment = applicationEngineEnvironment {
-        val accountRepository = InMemoryAccountRepository()
-        val atmService = AtmServiceImplementation(accountRepository)
+        val accountService = MockAccountService()
+        val customerService = MockCustomerService()
 
         module {
             mainModule()
-            AtmServiceModule(service = atmService, authSchemes = *arrayOf("basic"))
+            AccountServiceModule(service = accountService, authSchemes = *arrayOf("basic"))
+            CustomerServiceModule(service = customerService, authSchemes = *arrayOf("basic"))
         }
 
         connector {

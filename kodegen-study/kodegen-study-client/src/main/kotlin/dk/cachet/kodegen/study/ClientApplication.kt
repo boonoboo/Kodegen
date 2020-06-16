@@ -1,8 +1,8 @@
 package dk.cachet.kodegen.study
 
+import dk.cachet.kodegen.study.application.kodegen.AccountServiceClient
+import dk.cachet.kodegen.study.application.kodegen.CustomerServiceClient
 import dk.cachet.kodegen.study.infrastructure.dateSerializerModule
-import dk.cachet.kodegen.study.application.kodegen.AtmServiceClient
-import dk.cachet.kodegen.study.domain.Card
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.apache.Apache
 import io.ktor.client.features.auth.Auth
@@ -36,12 +36,11 @@ class ClientApplication {
         }
     }
 
-    // Initialize a DateService service invoker
-    private val service = AtmServiceClient(client, "http://localhost:8080")
+    private val accountService = AccountServiceClient(client, "http://localhost:8080")
+    private val customerService = CustomerServiceClient(client, "http://localhost:8080")
 
     fun runApp() {
-        val card = Card("4571 1928 3746 5555")
-        val receipt = runBlocking { service.getReceipt(card) }
-        println("Balance was retrived on ${receipt.date}. Your balance is: ${receipt.balance}")
+        val customer = runBlocking { customerService.getCustomerById("0") }
+        val accounts = runBlocking { accountService.getAccountsByCustomer(customer) }
     }
 }
